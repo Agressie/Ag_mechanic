@@ -1,0 +1,189 @@
+/*
+ * ag_mechanic NUI - shared styling
+ *
+ * Palette: electric cyan on deep navy, ice white type. Panels are thin bright
+ * outlines over near-black blue with a soft inner glow, so the UI reads as
+ * backlit glass rather than flat cards.
+ *
+ *   Primary   Electric Cyan  #1EA6F0
+ *   Secondary Deep Blue      #0E62B8
+ *   Tertiary  Ice White      #EFFBFE
+ */
+
+:root {
+    /* --- surfaces: deep dark blue, not grey --- */
+    --bg:            #040a14;
+    --bg-raised:     #071223;
+    --bg-panel:      #0a1a2e;
+    --bg-hover:      #0e2440;
+    --bg-deep:       #020610;
+
+    /* --- structure: cyan at low opacity, so edges glow rather than outline --- */
+    --line:          rgba(30, 166, 240, 0.20);
+    --line-strong:   rgba(30, 166, 240, 0.48);
+
+    /* --- type --- */
+    --text:          #effbfe;
+    --text-dim:      #9dc2dc;
+    --text-faint:    #5d80a0;
+
+    /* --- brand --- */
+    --accent:        #1ea6f0;
+    --accent-deep:   #0e62b8;
+    --accent-dim:    rgba(30, 166, 240, 0.42);
+    --accent-soft:   rgba(30, 166, 240, 0.12);
+    --glow:          0 0 18px rgba(30, 166, 240, 0.28);
+    --glow-strong:   0 0 26px rgba(30, 166, 240, 0.45);
+
+    /* --- condition bands: these carry meaning, so they stay readable --- */
+    --band-excellent: #2ee6a8;
+    --band-good:      #7ddf5c;
+    --band-worn:      #ffd23f;
+    --band-poor:      #ff9243;
+    --band-critical:  #ff6b6b;
+    --band-dead:      #e63946;
+    --band-unknown:   #3d5570;
+
+    --ok:      #2ee6a8;
+    --warn:    #ffd23f;
+    --danger:  #ff6b6b;
+
+    /* --- status surfaces --- */
+    --ok-bg:       rgba(46, 230, 168, 0.09);
+    --ok-line:     rgba(46, 230, 168, 0.38);
+    --ok-text:     #7cf3ca;
+    --warn-bg:     rgba(255, 210, 63, 0.09);
+    --warn-line:   rgba(255, 210, 63, 0.34);
+    --danger-bg:   rgba(255, 107, 107, 0.10);
+    --danger-line: rgba(255, 107, 107, 0.38);
+    --danger-text: #ffb0b0;
+
+    --radius:     10px;
+    --radius-sm:  6px;
+    --shadow:     0 28px 70px rgba(0, 0, 0, 0.72);
+
+    --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+    --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: transparent;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    overflow: hidden;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    border: 1px solid var(--line);
+    background: var(--bg-panel);
+    border-radius: var(--radius-sm);
+    padding: 8px 14px;
+    transition: background 0.12s ease, border-color 0.12s ease,
+                box-shadow 0.12s ease, transform 0.08s ease, color 0.12s ease;
+}
+button:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--line-strong);
+    box-shadow: var(--glow);
+}
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+button.primary {
+    background: linear-gradient(180deg, var(--accent) 0%, var(--accent-deep) 100%);
+    border-color: var(--accent);
+    color: #02121f;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    box-shadow: var(--glow);
+}
+button.primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #3fb8fb 0%, #1470cc 100%);
+    border-color: #3fb8fb;
+    box-shadow: var(--glow-strong);
+}
+
+button.danger { border-color: var(--danger-line); color: var(--danger-text); background: var(--danger-bg); }
+button.danger:hover:not(:disabled) {
+    background: rgba(255, 107, 107, 0.18);
+    border-color: var(--danger);
+    box-shadow: 0 0 18px rgba(255, 107, 107, 0.28);
+}
+
+button.ghost { background: transparent; border-color: transparent; color: var(--text-dim); box-shadow: none; }
+button.ghost:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); box-shadow: none; }
+
+input, select {
+    font: inherit;
+    color: var(--text);
+    background: var(--bg-deep);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    width: 100%;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+input:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent-soft), var(--glow);
+}
+input::placeholder { color: var(--text-faint); }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(30, 166, 240, 0.24); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(30, 166, 240, 0.45); }
+
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.dim { color: var(--text-dim); }
+.faint { color: var(--text-faint); }
+.row { display: flex; align-items: center; gap: 10px; }
+.col { display: flex; flex-direction: column; }
+.spacer { flex: 1; }
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(ellipse at center, rgba(4, 12, 26, 0.55) 0%, rgba(1, 3, 8, 0.78) 100%);
+    backdrop-filter: blur(3px);
+}
+
+/* Backlit-glass panel: bright hairline, dark fill, soft inner cyan wash. */
+.card {
+    background: linear-gradient(180deg, var(--bg-raised) 0%, var(--bg) 100%);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow), inset 0 0 40px rgba(30, 166, 240, 0.05);
+}
+
+.eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 600;
+}
+
+.empty {
+    padding: 32px;
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 13px;
+}
