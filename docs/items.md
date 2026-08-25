@@ -106,7 +106,7 @@ The three `client.export` entries are what make using an item do something:
 | Item | Using it |
 | --- | --- |
 | `mechanic_tablet` | opens the tablet |
-| `obd_scanner` | starts a diagnostic on the nearest vehicle |
+| `obd_scanner` | plugs into the nearest vehicle and opens the scanner device |
 | `ducttape` / `zipties` | opens the report filtered to what can be bodged |
 
 ## qb-inventory
@@ -121,6 +121,10 @@ names are the same:
     shouldClose = true, combinable = nil, description = 'Cheap, and neglected on every vehicle you will ever see.',
 },
 ```
+
+`obd_scanner` is not optional flavour: without one in your inventory the scanner
+interaction is refused, server side. Everything the control modules know is
+behind that item.
 
 For the three useable items, set `useable = true` and register the handler in
 your own server script:

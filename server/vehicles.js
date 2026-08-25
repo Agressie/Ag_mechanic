@@ -25,6 +25,7 @@ function fresh(key, plate, model, blueprint) {
         health: AGM.Health.blank(blueprint),
         tiers: AGM.Health.blankTiers(blueprint),
         symptoms: [],
+        scanner: { clearedAt: 0, clearedOdo: 0 },
         odometer: 0,
         dirty: true,
         seen: Date.now(),
@@ -64,6 +65,7 @@ AGM.vehicles.load = async function (key, plate, model, blueprint) {
         record.health = AGM.Health.sanitise(storedBlueprint, AGM.db.json(row.health, null));
         record.tiers = AGM.Health.sanitiseTiers(storedBlueprint, AGM.db.json(row.tiers, null));
         record.symptoms = (AGM.db.json(row.symptoms, []) || []).slice(0, SYMPTOM_LIMIT);
+        record.scanner = AGM.db.json(row.scanner, null) || { clearedAt: 0, clearedOdo: 0 };
         record.odometer = Number(row.odometer) || 0;
         record.model = row.model || record.model;
         record.dirty = false;
@@ -121,8 +123,8 @@ async function save(record) {
     if (!AGM.db.ready) return;
     await AGM.db.query(
         `INSERT INTO ag_mechanic_vehicles
-            (vehicle_key, plate, model, blueprint, health, tiers, symptoms, odometer, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (vehicle_key, plate, model, blueprint, health, tiers, symptoms, scanner, odometer, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
             plate = VALUES(plate),
             model = VALUES(model),
@@ -130,6 +132,7 @@ async function save(record) {
             health = VALUES(health),
             tiers = VALUES(tiers),
             symptoms = VALUES(symptoms),
+            scanner = VALUES(scanner),
             odometer = VALUES(odometer),
             updated_at = VALUES(updated_at)`,
         [
@@ -140,6 +143,7 @@ async function save(record) {
             JSON.stringify(record.health),
             JSON.stringify(record.tiers),
             JSON.stringify(record.symptoms),
+            JSON.stringify(record.scanner || { clearedAt: 0, clearedOdo: 0 }),
             AGM.util.round(record.odometer, 1),
             Date.now(),
         ],

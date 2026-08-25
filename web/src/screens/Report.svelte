@@ -20,13 +20,21 @@
     let filter = $state(untrack(() => payload.focus) === 'field' ? 'field' : 'attention');
 
     const QUALITY = {
-        perfect: { label: 'Full read', tone: 'ok', note: 'Every sensor answered.' },
-        good: { label: 'Good read', tone: 'ok', note: 'Faults are exact; healthy parts are estimates.' },
-        partial: { label: 'Partial read', tone: 'warn', note: 'Estimates only, and some parts would not answer.' },
-        vague: { label: 'Poor read', tone: 'bad', note: 'Only the obvious faults came through.' },
+        perfect: { label: 'Thorough inspection', tone: 'ok', note: 'Everything measured properly.' },
+        good: { label: 'Good inspection', tone: 'ok', note: 'Faults measured; healthy parts eyeballed.' },
+        partial: { label: 'Rushed inspection', tone: 'warn', note: 'Rough estimates, and some parts not reached.' },
+        vague: { label: 'Poor inspection', tone: 'bad', note: 'Only the obvious faults were found.' },
     };
 
-    const quality = $derived(QUALITY[report.quality] || QUALITY.vague);
+    const quality = $derived(report.quality ? QUALITY[report.quality] : null);
+    const coverage = $derived(report.coverage || { known: 0, total: 0 });
+
+    /* Which tool found each part. The two see different things, so saying so is
+       the whole point of showing it. */
+    const SOURCE = {
+        scan: { label: 'Scanner', glyph: '⚡', hint: 'Reported by a control module' },
+        inspection: { label: 'By hand', glyph: '🔧', hint: 'Found by inspecting the vehicle' },
+    };
 
     const rows = $derived(
         report.groups.flatMap((group) => group.items.map((item) => ({ ...item, groupLabel: group.label }))),
@@ -85,8 +93,15 @@
                 <h1>{report.blueprintLabel || 'Vehicle'} <span class="plate mono">{report.plate}</span></h1>
                 <div class="sub dim">
                     {report.odometer ? `${report.odometer.toLocaleString('en-US')} km` : 'mileage unknown'}
-                    &middot; <span class={quality.tone}>{quality.label}</span>
-                    &middot; {quality.note}
+                    &middot; {coverage.known} of {coverage.total} parts checked
+                    {#if quality}&middot; <span class={quality.tone}>{quality.label}</span>{/if}
+                </div>
+                <div class="tools">
+                    <span class="tool" class:on={report.scanned}>⚡ scanner</span>
+                    <span class="tool" class:on={report.inspected}>🔧 inspection</span>
+                    {#if quality}<span class="tool-note">{quality.note}</span>{/if}
+                    {#if !report.scanned}<span class="tool-note">Plug a scanner in for the electronics.</span>{/if}
+                    {#if !report.inspected}<span class="tool-note">Inspect by hand for the mechanical parts.</span>{/if}
                 </div>
             </div>
             <div class="overall">
@@ -145,8 +160,18 @@
                     {#each group.items as item}
                         <div class="part" class:dead={item.dead}>
                             <div class="part-name">
-                                <span>{item.label}</span>
+                                <span title={item.where || ''}>{item.label}</span>
                                 <div class="tags">
+                                    {#if item.source}
+                                        <span class="tag src" title={SOURCE[item.source].hint}>
+                                            {SOURCE[item.source].glyph} {SOURCE[item.source].label}
+                                        </span>
+                                    {/if}
+                                    {#if item.codes && item.codes.length}
+                                        <span class="tag code" title={item.codes.map((c) => `${c.code} ${c.desc}`).join('\n')}>
+                                            {item.codes[0].code}{item.codes.length > 1 ? ` +${item.codes.length - 1}` : ''}
+                                        </span>
+                                    {/if}
                                     {#if item.dead}<span class="tag bad">Failed</span>
                                     {:else if item.required}<span class="tag warn">Due</span>{/if}
                                     {#if item.critical}<span class="tag">Critical</span>{/if}
@@ -155,7 +180,12 @@
                                 </div>
                             </div>
 
-                            <ConditionBar value={item.health} band={item.band} label={item.bandLabel} />
+                            <div class="col">
+                                <ConditionBar value={item.health} band={item.band} label={item.bandLabel} />
+                                {#if item.where && !item.unknown && item.required}
+                                    <span class="where faint">{item.where}</span>
+                                {/if}
+                            </div>
 
                             <div class="actions">
                                 {#each actions(item) as action}
@@ -167,7 +197,13 @@
                                 {/each}
                                 {#if !actions(item).length}
                                     <span class="faint small">
-                                        {item.unknown ? 'diagnose again' : item.method === 'garage' ? 'mechanic + lift' : 'mechanic'}
+                                        {#if item.unknown}
+                                            {item.scannable ? 'scan it' : 'inspect by hand'}
+                                        {:else if item.method === 'garage'}
+                                            mechanic + lift
+                                        {:else}
+                                            mechanic
+                                        {/if}
                                     </span>
                                 {/if}
                             </div>
@@ -188,7 +224,7 @@
 </div>
 
 <style>
-    .sheet { width: 880px; max-height: 84vh; display: flex; flex-direction: column; padding: 22px 24px 14px; }
+    .sheet { width: 960px; max-height: 86vh; display: flex; flex-direction: column; padding: 22px 24px 14px; }
 
     header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
     h1 { margin: 4px 0 6px; font-size: 21px; font-weight: 600; }
@@ -202,6 +238,13 @@
         color: var(--text-dim);
     }
     .sub { font-size: 12px; }
+    .tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .tool {
+        font-size: 11px; padding: 2px 9px; border-radius: 20px;
+        border: 1px solid var(--line); color: var(--text-faint);
+    }
+    .tool.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+    .tool-note { font-size: 11px; color: var(--text-faint); }
     .sub .ok { color: var(--ok); }
     .sub .warn { color: var(--warn); }
     .sub .bad { color: var(--danger); }
@@ -251,18 +294,20 @@
 
     .part {
         display: grid;
-        grid-template-columns: 1fr auto auto;
+        grid-template-columns: minmax(0, 1fr) auto auto;
         align-items: center;
-        gap: 16px;
-        padding: 9px 10px;
+        gap: 18px;
+        padding: 10px 10px;
         border-radius: var(--radius-sm);
         border: 1px solid transparent;
     }
     .part:hover { background: var(--bg-panel); border-color: var(--line); }
     .part.dead { background: var(--danger-bg); }
 
-    .part-name { display: flex; align-items: center; gap: 8px; font-size: 13px; min-width: 0; }
-    .tags { display: flex; gap: 4px; flex-wrap: wrap; }
+    /* Name on its own line, provenance beneath it - stops long part names
+       wrapping around the code chips. */
+    .part-name { display: flex; flex-direction: column; gap: 5px; font-size: 13px; min-width: 0; }
+    .tags { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
     .tag {
         font-size: 10px;
         letter-spacing: 0.04em;
@@ -275,6 +320,9 @@
     .tag.warn { border-color: var(--warn); color: var(--warn); }
     .tag.bad { border-color: var(--danger); color: var(--danger); }
     .tag.faint { opacity: 0.6; }
+    .tag.src { border-color: var(--line); text-transform: none; letter-spacing: 0; }
+    .tag.code { border-color: var(--accent-dim); color: var(--accent); font-family: var(--mono); letter-spacing: 0; }
+    .where { font-size: 11px; margin-top: 3px; max-width: 260px; line-height: 1.35; }
 
     .actions { display: flex; gap: 6px; justify-content: flex-end; min-width: 220px; }
     .actions button { font-size: 12px; padding: 5px 10px; }

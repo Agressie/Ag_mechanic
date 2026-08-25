@@ -94,7 +94,7 @@ async function context(src, args, opts = {}) {
 /** Applies the result of a repair: persist, invalidate reports, tell clients. */
 async function commit(ctx, detail) {
     ctx.record.dirty = true;
-    AGM.diagnose.applyRepair(ctx.key, ctx.record.blueprint, ctx.comp.id, ctx.record.health[ctx.comp.id]);
+    AGM.diagnose.noteRepair(ctx.key, ctx.record.blueprint, ctx.comp.id, ctx.record.health[ctx.comp.id]);
     await AGM.vehicles.saveNow(ctx.key);
     AGM.vehicles.broadcast(ctx.record, ctx.netId);
     AGM.db.log(ctx.bay ? ctx.bay.shop.id : '', ctx.player.name, detail.action, detail);
@@ -219,8 +219,7 @@ AGM.rpc.register('repair:service', async (src, args) => {
     const record = await AGM.vehicles.load(key, plate, args.model, blueprint);
     if (!record) return { ok: false, reason: 'noRecord' };
 
-    const report = AGM.diagnose.get(key, player.citizenid);
-    if (!report) return { ok: false, reason: 'diagnoseFirst' };
+    if (!AGM.diagnose.hasAny(key, player.citizenid)) return { ok: false, reason: 'diagnoseFirst' };
 
     const vehCoords = GetEntityCoords(entity);
     const bay = AGM.repair.bayAt(vehCoords);
@@ -230,7 +229,7 @@ AGM.rpc.register('repair:service', async (src, args) => {
 
     for (const job of AGM.Health.repairPlan(blueprint, record.health).jobs) {
         if (!job.required) continue;
-        if (!report.revealed.includes(job.id)) {
+        if (!AGM.diagnose.knows(key, player.citizenid, job.id)) {
             skipped.push({ id: job.id, label: job.label, reason: 'undiagnosed' });
             continue;
         }
@@ -254,7 +253,7 @@ AGM.rpc.register('repair:service', async (src, args) => {
 
     if (done.length) {
         record.dirty = true;
-        for (const entry of done) AGM.diagnose.applyRepair(key, blueprint, entry.id, entry.to);
+        for (const entry of done) AGM.diagnose.noteRepair(key, blueprint, entry.id, entry.to);
         await AGM.vehicles.saveNow(key);
         AGM.vehicles.broadcast(record, netId);
         AGM.db.log(bay ? bay.shop.id : '', player.name, 'repair_service', { plate, done: done.map((d) => d.id) });
@@ -283,7 +282,7 @@ AGM.rpc.register('repair:triage', async (src, args) => {
     const record = AGM.vehicles.peek(key);
     if (!record) return null;
 
-    const report = AGM.diagnose.get(key, player.citizenid);
+    const report = AGM.diagnose.report(record, player.citizenid);
     if (!report) return { ok: false, reason: 'diagnoseFirst' };
 
     return { ok: true, triage: report.triage, plan: AGM.Health.repairPlan(record.blueprint, record.health) };

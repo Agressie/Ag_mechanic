@@ -39,6 +39,7 @@ const SCHEMA = [
         health        LONGTEXT     NULL,
         tiers         LONGTEXT     NULL,
         symptoms      LONGTEXT     NULL,
+        scanner       LONGTEXT     NULL,
         odometer      DOUBLE       NOT NULL DEFAULT 0,
         updated_at    BIGINT       NOT NULL DEFAULT 0,
         PRIMARY KEY (vehicle_key),
@@ -95,6 +96,30 @@ const SCHEMA = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 ];
 
+/*
+ * Columns added after the first release. CREATE TABLE IF NOT EXISTS will not
+ * touch a table that already exists, so anything added later has to be applied
+ * separately - checked first so re-running is free.
+ */
+const ADDED_COLUMNS = [
+    { table: 'ag_mechanic_vehicles', column: 'scanner', definition: 'LONGTEXT NULL AFTER symptoms' },
+];
+
+async function ensureColumn(table, column, definition) {
+    const exists = await AGM.db.scalar(
+        `SELECT COUNT(*) FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+        [table, column],
+    ).catch(() => null);
+
+    if (exists === null) return;          // could not check; leave well alone
+    if (Number(exists) > 0) return;
+
+    await AGM.db.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`)
+        .then(() => AGM.log.info(`added column ${table}.${column}`))
+        .catch((err) => AGM.log.error(`could not add ${table}.${column}:`, err && err.message));
+}
+
 AGM.db.migrate = async function () {
     for (const stmt of SCHEMA) {
         try {
@@ -104,6 +129,11 @@ AGM.db.migrate = async function () {
             return false;
         }
     }
+
+    for (const { table, column, definition } of ADDED_COLUMNS) {
+        await ensureColumn(table, column, definition);
+    }
+
     AGM.db.ready = true;
     AGM.log.info('database schema ready');
     return true;

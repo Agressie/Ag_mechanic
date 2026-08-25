@@ -117,7 +117,7 @@ exports('useTablet', () => AGM.tablet.open('home'));
 exports('useScanner', () => {
     const vehicle = AGM.state.nearestVehicle(6.0);
     if (!vehicle) return AGM.ui.notify(AGM.Config.locale.noVehicle, 'error');
-    AGM.diagnose.run(vehicle);
+    AGM.scanner.run(vehicle);
 });
 
 exports('useImprovised', () => {

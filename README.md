@@ -75,8 +75,35 @@ nowhere; a dead main rotor means it does not fly.
 
 ### You cannot fix what you have not found
 
-Interacting with a vehicle offers **Run a diagnostic**. That pops the bonnet and
-starts the minigame:
+Two tools, and they see different halves of the vehicle.
+
+**The scanner** is a handheld device with an LCD and six buttons — you work the
+firmware, not a menu. It needs `obd_scanner` in your inventory, and it reads what
+the control modules know: real fault codes with severities, the module that
+reported each one, the exact sub-location (*which* cylinder, *which* corner), and
+plain-language directions to the part. Also live sensor data, freeze frames,
+readiness monitors, and a per-module fault count. Codes are deterministic — the
+same car always reports the same cylinder, so scanning twice tells you the same
+story. Full details in [`docs/scanner.md`](docs/scanner.md).
+
+```
+P0301                              2/6  STORED
+Cylinder 1 misfire detected
+------------------------------------------------
+SYSTEM   Engine Control Module
+PART     Spark Plugs & Coil Packs
+AT       Cylinder 1, bank 1
+WHERE    Coil pack on cylinder 1, under the
+         ignition cover
+```
+
+Erasing codes turns the light off and repairs nothing: faults drop to pending,
+the monitors read *incomplete*, and everything re-confirms after 2 km of
+driving. It is logged, because it is exactly the trick somebody pulls before
+selling a car.
+
+**Inspecting by hand** is the minigame, and it finds everything no sensor is
+watching:
 
 1. **Back the bolts off.** Hold `SPACE` to load the breaker bar and release
    inside the torque band. Overshoot and you round the head off; stop short and
@@ -84,15 +111,26 @@ starts the minigame:
 2. **Unplug the sensor lines.** Hold `SHIFT` to press the release tab, then drag
    the connector out at a steady rate. Snatch it and the tab snaps.
 
-How cleanly that goes decides how much of the report you get: exact percentages
-on everything, exact on faults only, banded estimates, or just the obvious
-faults with the rest unreadable. Holding the job and carrying an OBD scanner both
-help. A good report also lists *symptoms* — "Held on the rev limiter ×3" — so a
-mechanic can tell the customer exactly what they have been doing.
+How cleanly that goes decides how much you learn: exact figures on everything,
+exact on faults only, rough estimates, or just the obvious faults. It is also
+the only way to read the vehicle's *history* — "Held on the rev limiter ×3" — so
+a mechanic can tell the customer what they have been doing.
 
-Reports go stale after fifteen minutes, or sooner if the vehicle's condition
-drifts. Repairing something updates the report in place rather than voiding it,
-so a mechanic does not have to crawl back under the car between jobs.
+Neither tool is a substitute for the other. No code will ever set for a worn
+brake pad, a bent driveshaft or tired dampers, because nothing is watching them:
+
+| The scanner finds | Only an inspection finds |
+| --- | --- |
+| engine, gaskets, filter, plugs, oil, cooling, fuel | driveshaft |
+| exhaust, ECU, battery, clutch, gearbox | brake pads and discs |
+| brake lines, steering, wheel-speed sensors, lights | suspension and dampers |
+| rotors, gearboxes, hydraulics, controls, avionics | wheels, body, glass |
+
+Knowledge is tracked **per component**, so the two tools accumulate into one
+report that says which found what. Findings go stale after fifteen minutes, or
+sooner for a part whose condition has drifted — per part, so one thing changing
+does not throw away everything you know about the rest of the car. Repairing
+something refreshes that part rather than voiding the lot.
 
 ### Three ways to fix it — and only sometimes a tow
 
@@ -193,6 +231,7 @@ Senior Mechanic, Shop Manager, Owner.
 | `config/config.js` | job, grades and permissions, tablet, repair rules, diagnostics, economy, persistence, anti-abuse, all player-facing text |
 | `config/components.js` | the component health blueprints — the heart of it |
 | `config/tiers.js` | the named upgrade ladders |
+| `config/dtc.js` | fault codes, which module reports them, and where each part physically is |
 | `config/damage.js` | what each kind of abuse damages, and detection thresholds |
 | `config/handling.js` | how a performance axis maps onto handling fields |
 | `config/shop.js` | catalogue, prices, order and delivery timings |
@@ -228,9 +267,10 @@ npm run dev      # http://localhost:5173/?screen=tablet
 npm run build    # writes ../html
 ```
 
-`?screen=` takes `tablet`, `report`, `upgrades` or `diagnose`, and the dev
-fixtures in `web/src/lib/dev.js` mean every screen renders with plausible
-content in a plain browser.
+`?screen=` takes `tablet`, `report`, `upgrades`, `diagnose` or `scanner`, and the
+dev fixtures in `web/src/lib/dev.js` mean every screen renders with plausible
+content in a plain browser — including canned RPC responses, so the tablet's apps
+and the scanner's live data both work without the game.
 
 ## Exports and commands
 
@@ -251,6 +291,15 @@ exports.ag_mechanic:useImprovised()
 `agmechanic <flush|stats|orders|reset [plate]>` — console, or a player with the
 `command.agmechanic` ace. `agmechanic_debug` dumps the nearest vehicle's state to
 F8 when `Config.debug` is on.
+
+## Documentation
+
+| | |
+| --- | --- |
+| [`docs/scanner.md`](docs/scanner.md) | the scanner: what it can see, the menu, erasing codes, adding your own |
+| [`docs/items.md`](docs/items.md) | every item, ready to paste into ox_inventory or qb-core |
+| [`docs/locations.md`](docs/locations.md) | moving the shop: bays, lifts, stash, delivery route |
+| [`docs/tuning.md`](docs/tuning.md) | making the damage model harsher or gentler |
 
 ## Notes on the implementation
 

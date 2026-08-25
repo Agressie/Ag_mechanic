@@ -45,11 +45,19 @@ AGM.targets.registerVehicles = function () {
     oxTarget('addGlobalVehicle', [
         {
             name: 'ag_mechanic_diagnose',
-            label: 'Run a diagnostic',
+            label: 'Inspect the vehicle by hand',
             icon: 'fa-solid fa-stethoscope',
             distance: 2.5,
             bones: ['bonnet', 'engine'],
             event: 'ag_mechanic:client:targetDiagnose',
+        },
+        {
+            name: 'ag_mechanic_scan',
+            label: 'Plug in a diagnostic scanner',
+            icon: 'fa-solid fa-plug-circle-bolt',
+            distance: 2.5,
+            items: AGM.Config.scanner.item ? [AGM.Config.scanner.item] : undefined,
+            event: 'ag_mechanic:client:targetScan',
         },
         {
             name: 'ag_mechanic_report',
@@ -184,8 +192,9 @@ AGM.targets.remove = function () {
     for (const blip of blips) RemoveBlip(blip);
     blips.length = 0;
     oxTarget('removeGlobalVehicle', [
-        'ag_mechanic_diagnose', 'ag_mechanic_report', 'ag_mechanic_field',
-        'ag_mechanic_triage', 'ag_mechanic_service', 'ag_mechanic_upgrades',
+        'ag_mechanic_diagnose', 'ag_mechanic_scan', 'ag_mechanic_report',
+        'ag_mechanic_field', 'ag_mechanic_triage', 'ag_mechanic_service',
+        'ag_mechanic_upgrades',
     ]);
 };
 

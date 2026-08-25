@@ -58,9 +58,17 @@ AGM.Config = {
     },
 
     /* ---------------------------------------------------------- diagnose */
+    /*
+     * Two ways to find a fault, and they see different things.
+     *
+     *   the scanner   reads what the control modules know: engine, fuel,
+     *                 ignition, electrics, ABS, gearbox. Needs the item.
+     *   inspection    everything no sensor is watching: pads, dampers, the
+     *                 driveshaft, panels, glass. Needs the minigame.
+     *
+     * Neither is a substitute for the other, which is the point.
+     */
     diagnose: {
-        /* Anyone can pop the hood and guess; a scanner makes the report exact. */
-        scannerItem: 'obd_scanner',
         duration: 0,               // driven by the minigame, not a timer
         /* How long a report stays "fresh" before the numbers are stale (ms). */
         reportTtl: 15 * 60 * 1000,
@@ -78,7 +86,25 @@ AGM.Config = {
         },
         /* Being on the mechanic job is worth this much added score. */
         jobScoreBonus: 0.08,
-        scannerScoreBonus: 0.12,
+    },
+
+    /* ----------------------------------------------------------- scanner */
+    scanner: {
+        /* Required in the player's inventory. No item, no scan. */
+        item: 'obd_scanner',
+        /* Plugging into the port, before the device wakes up. */
+        hookupDuration: 4500,
+        /* A scan's findings stay usable for this long (ms). */
+        linkTtl: 10 * 60 * 1000,
+
+        /* Erasing codes turns the light off. It repairs nothing, and a fault
+           re-confirms once the vehicle has been driven this far again. */
+        allowErase: true,
+        eraseRequiresJob: false,
+        reconfirmMetres: 2000,
+
+        /* Live data refresh interval in the device UI (ms). */
+        liveInterval: 900,
     },
 
     /* ------------------------------------------------------------ garages */

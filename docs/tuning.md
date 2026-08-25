@@ -109,6 +109,16 @@ field whose stock value reads back as zero or non-finite is skipped and logged
 once, so if aircraft thrust does nothing on your build, check `CFlyingHandlingData`
 there rather than in the code.
 
+## Which faults the scanner reports
+
+`config/dtc.js` decides that, separately from health: each code has an `at`
+threshold, so a component can set a mild code early and a serious one later. If
+you want the scanner to warn sooner, raise the `at` values; to make it quieter,
+lower them. Setting `ecu: false` on a component hides it from the scanner
+entirely and pushes it onto the hands-on inspection.
+
+See [`scanner.md`](scanner.md) for the placeholder rules and the erase mechanic.
+
 ## Testing without waiting
 
 ```

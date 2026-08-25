@@ -27,6 +27,7 @@ for (const file of [
     'config/classes.js',
     'config/components.js',
     'config/tiers.js',
+    'config/dtc.js',
     'config/damage.js',
     'config/handling.js',
     'config/shop.js',
@@ -112,6 +113,70 @@ for (const bp of Object.keys(AGM.Components.blueprints)) {
   if (!list.some((c) => c.critical)) bad(`${bp} has no critical component`);
   if (!list.some((c) => c.field)) bad(`${bp} has nothing that can be bodged`);
   if (!list.some((c) => AGM.Health.repairMethod(c, 100) === 'garage')) bad(`${bp} has no workshop-only work`);
+}
+
+step('dtc -> components');
+{
+    const TOKENS = {
+        cylinder: ['cyl', 'bank'],
+        bank: ['bank'],
+        wheel: ['wheel'],
+        blade: ['n'],
+        wing: ['wing'],
+        fixed: ['bank'],
+    };
+
+    for (const [bp, set] of Object.entries(AGM.Dtc.sets)) {
+        if (!AGM.Components.blueprints[bp]) { bad(`dtc set for unknown blueprint '${bp}'`); continue; }
+        const ids = AGM.Components.ids(bp);
+
+        for (const id of Object.keys(set)) {
+            if (!ids.includes(id)) bad(`dtc: ${bp}.${id} is not a component of ${bp}`);
+        }
+        for (const id of ids) {
+            if (!set[id]) bad(`dtc: ${bp}.${id} has no entry, so it is neither scannable nor documented`);
+        }
+
+        for (const [id, entry] of Object.entries(set)) {
+            if (!ids.includes(id)) continue;
+
+            if (!TOKENS[entry.location]) bad(`dtc: ${bp}.${id} has unknown location kind '${entry.location}'`);
+            if (!entry.where) bad(`dtc: ${bp}.${id} has no 'where' text`);
+            if (entry.module && !AGM.Dtc.modules.some((m) => m.id === entry.module)) {
+                bad(`dtc: ${bp}.${id} reports to unknown module '${entry.module}'`);
+            }
+            if (entry.ecu !== false && !entry.codes.length) {
+                bad(`dtc: ${bp}.${id} is marked visible but has no codes`);
+            }
+
+            /* A placeholder the location kind cannot fill would render as
+               literal "{cyl}" on the scanner. */
+            const allowed = TOKENS[entry.location] || [];
+            const texts = entry.codes.flatMap((c) => [c.code, c.desc]).concat([entry.where]);
+            for (const text of texts) {
+                for (const match of String(text).matchAll(/\{(\w+)\}/g)) {
+                    if (!allowed.includes(match[1])) {
+                        bad(`dtc: ${bp}.${id} uses {${match[1]}} but its location is '${entry.location}'`);
+                    }
+                }
+            }
+
+            for (const code of entry.codes) {
+                if (!(code.at > 0 && code.at <= 100)) bad(`dtc: ${bp}.${id} code ${code.code} has an out-of-range threshold ${code.at}`);
+                if (!['low', 'medium', 'high'].includes(code.severity)) {
+                    bad(`dtc: ${bp}.${id} code ${code.code} has bad severity '${code.severity}'`);
+                }
+            }
+        }
+    }
+}
+
+step('both diagnostic tools matter on every machine');
+for (const bp of Object.keys(AGM.Components.blueprints)) {
+    const visible = AGM.Dtc.visibleComponents(bp);
+    const hidden = AGM.Components.ids(bp).filter((id) => !visible.includes(id));
+    if (!visible.length) bad(`${bp} has nothing the scanner can read`);
+    if (!hidden.length) bad(`${bp} has nothing that needs a hands-on inspection`);
 }
 
 step('locations sanity');

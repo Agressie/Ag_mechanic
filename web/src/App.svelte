@@ -3,8 +3,9 @@
     import Report from './screens/Report.svelte';
     import Upgrades from './screens/Upgrades.svelte';
     import Diagnose from './screens/Diagnose.svelte';
+    import Scanner from './screens/Scanner.svelte';
     import { isBrowser } from './lib/nui.js';
-    import { devTablet, devReport, devUpgrades, devDiagnose } from './lib/dev.js';
+    import { devTablet, devReport, devUpgrades, devDiagnose, devScanner } from './lib/dev.js';
 
     let screen = $state(null);
     let payload = $state({});
@@ -33,7 +34,7 @@
            worked on without launching the game. */
         if (isBrowser && !screen) {
             const wanted = new URLSearchParams(window.location.search).get('screen') || 'tablet';
-            const fixtures = { tablet: devTablet, report: devReport, upgrades: devUpgrades, diagnose: devDiagnose };
+            const fixtures = { tablet: devTablet, report: devReport, upgrades: devUpgrades, diagnose: devDiagnose, scanner: devScanner };
             screen = wanted;
             payload = (fixtures[wanted] || devTablet)();
         }
@@ -51,5 +52,7 @@
         <Upgrades {payload} />
     {:else if screen === 'diagnose'}
         <Diagnose {payload} />
+    {:else if screen === 'scanner'}
+        <Scanner {payload} />
     {/if}
 {/key}
