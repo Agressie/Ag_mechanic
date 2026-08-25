@@ -94,9 +94,19 @@ talk to an aircraft:
 | `bite_tester` | AV-4 | helicopters, aircraft | ARINC 429 |
 | `marine_diagnostic` | MD-2 | boats | SAE J1939 |
 
+They are not one device with a filter. Each is drawn after the real instrument
+its trade uses: the AGM-9000 is a consumer code reader — portrait, rubber grips,
+hardwired lead, round D-pad, and the three PASS/PEND/MIL readiness lamps that
+light from the live scan. The AV-4 is a flight-line test set — landscape rugged
+case with hazard-yellow corner bumpers, carry handle, MIL-spec circular
+connectors, and **five soft keys** whose labels sit on the glass above them and
+change with the page. The MD-2 is a sealed marine reader — gasket seam, four
+sealing screws, an IP67 badge, gloved-hand keys, and a black Deutsch 9-pin under
+a weather flap.
+
 Each speaks its own trade language too — stored codes on modules, active faults
-on LRUs, active DTCs on ECUs — so the three genuinely feel like different
-instruments. Bring the wrong box and it tells you which one you wanted. Codes are
+on LRUs, active DTCs on ECUs — right down to the silkscreen on the erase key.
+Bring the wrong box and it tells you which one you wanted. Codes are
 deterministic: the same car always reports the same cylinder, so scanning twice
 tells you the same story. Full details in [`docs/scanner.md`](docs/scanner.md).
 

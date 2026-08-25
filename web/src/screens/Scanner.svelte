@@ -11,6 +11,9 @@
      * depresses the matching button on screen, so it still reads as hardware.
      */
     import { vehicleRpc, close } from '../lib/nui.js';
+    import ObdChassis from '../lib/chassis/ObdChassis.svelte';
+    import BiteChassis from '../lib/chassis/BiteChassis.svelte';
+    import MarineChassis from '../lib/chassis/MarineChassis.svelte';
 
     let { payload = {} } = $props();
 
@@ -248,6 +251,10 @@
             case 'erase':
                 if (!canErase) return beep('ERASE DISABLED');
                 return view === 'erase' ? undefined : go('erase');
+            case 'readiness':
+                return view === 'monitors' ? undefined : go('monitors');
+            case 'info':
+                return view === 'info' ? undefined : go('info');
             default:
                 return undefined;
         }
@@ -302,6 +309,49 @@
        tool, CLEAR on a BITE set, RESET on a marine reader. */
     const eraseKey = $derived(lex.erase.split(' ')[0]);
 
+    /*
+     * Five soft keys, the way a flight-line test set works: the labels live on
+     * the screen directly above the physical buttons, and change with the page.
+     */
+    const softKeys = $derived.by(() => {
+        const enter = view === 'code' ? lex.frame.split(' ')[0]
+            : view === 'systems' ? 'OPEN'
+                : view === 'systemParts' ? 'DETAIL'
+                    : view === 'part' ? 'OPEN'
+                        : view === 'erase' ? 'HOLD'
+                            : view === 'boot' || view === 'link' ? 'CONT'
+                                : 'SELECT';
+        return [
+            { label: stack.length || view !== 'menu' ? 'BACK' : 'EXIT', action: 'back' },
+            { label: 'UP', action: 'up' },
+            { label: 'DOWN', action: 'down' },
+            { label: enter, action: 'enter' },
+            { label: eraseKey, action: 'erase' },
+        ];
+    });
+
+    /* Traffic-light indicator, exactly what a consumer code reader shows. */
+    const lamps = $derived({
+        green: !scan.mil && !pending.length,
+        amber: pending.length > 0 && !scan.mil,
+        red: scan.mil,
+    });
+
+    /* Press-and-hold on ENTER, used by the erase confirmation. Handed to the
+       chassis so each one can wire it to its own physical key. */
+    function holdStart() {
+        if (view !== 'erase') return;
+        pressed = 'enter';
+        startErase();
+    }
+    function holdEnd() {
+        stopErase();
+    }
+
+    const chassis = $derived(
+        device.id === 'bite' ? BiteChassis : device.id === 'marine' ? MarineChassis : ObdChassis,
+    );
+
     /* "3/6" on the detail page, so you know where you are in the list. */
     const codeIndex = $derived.by(() => {
         if (!openCode) return '';
@@ -347,23 +397,10 @@
     }
 </script>
 
-<div class="overlay">
-    <div class="device">
-        <svg class="cable" viewBox="0 0 260 200" aria-hidden="true">
-            <path d="M232 200 C232 120 150 96 96 62 C60 40 42 18 38 -10" />
-            <path class="sheen" d="M232 200 C232 120 150 96 96 62 C60 40 42 18 38 -10" />
-        </svg>
-
-        <div class="shell">
-            <div class="brandbar">
-                <span class="brand">{device.model}</span>
-                <span class="brand-sub">{device.bus}</span>
-                <span class="mil" class:on={scan.mil}>{lex.lamp}</span>
-            </div>
-
-            <!-- ---------------------------------------------------- screen -->
-            <div class="lcd">
-                <div class="glass">
+{#snippet screen()}
+    <!-- The glass is part of the screen, not the case: the chassis provides the
+         bezel around it and the --lcd-* tokens that tint it. -->
+    <div class="glass">
                     {#if view === 'boot'}
                         <div class="boot">
                             {#each bootLines as line}<div class="line">{line}</div>{/each}
@@ -445,18 +482,18 @@
                         <div class="kv"><span>MIL</span><b class:alarm={scan.mil}>{scan.mil ? 'ON' : 'OFF'}</b></div>
 
                     {:else if view === 'erase'}
-                        <div class="statusbar"><span>ERASE</span><span class="spacer"></span><span class="alarm">CAUTION</span></div>
+                        <div class="statusbar"><span>{lex.erase}</span><span class="spacer"></span><span class="alarm">CAUTION</span></div>
                         <div class="desc">Clears {stored.length} {lex.code.toLowerCase()}{stored.length === 1 ? '' : 's'} and resets the monitors.</div>
                         <div class="desc dim">It does not repair anything. The fault will set again once the vehicle has been driven.</div>
                         <div class="holdbar"><div class="fill" style="width:{eraseHeld * 100}%"></div></div>
                         <div class="hint blink">HOLD ENTER TO CONFIRM</div>
 
                     {:else if view === 'erasing'}
-                        <div class="statusbar"><span>ERASE</span><span class="spacer"></span><span>BUSY</span></div>
+                        <div class="statusbar"><span>{lex.erase}</span><span class="spacer"></span><span>BUSY</span></div>
                         <div class="centre blink">CLEARING {lex.code}S...</div>
 
                     {:else if view === 'erased'}
-                        <div class="statusbar"><span>ERASE</span><span class="spacer"></span><span>DONE</span></div>
+                        <div class="statusbar"><span>{lex.erase}</span><span class="spacer"></span><span>DONE</span></div>
                         <div class="centre">{erasedCount} {lex.code}{erasedCount === 1 ? '' : 'S'} CLEARED</div>
                         <div class="desc dim">Monitors reset. Faults will re-confirm once it has been used again.</div>
                         <div class="hint">[ENTER] MAIN MENU</div>
@@ -522,225 +559,97 @@
                     {/if}
 
                     {#if status}<div class="toast">{status}</div>{/if}
-                </div>
-                <div class="scanlines"></div>
-            </div>
-
-            <!-- --------------------------------------------------- buttons -->
-            <div class="keypad">
-                <div class="side">
-                    <button class="key wide" class:held={pressed === 'back'} onclick={() => press('back')}>BACK</button>
-                    <button class="key wide danger" class:held={pressed === 'erase'} onclick={() => press('erase')}>{eraseKey}</button>
-                </div>
-
-                <div class="dpad">
-                    <button class="key arrow up" class:held={pressed === 'up'} onclick={() => press('up')} aria-label="Up">▲</button>
-                    <button class="key arrow left" class:held={pressed === 'left'} onclick={() => press('left')} aria-label="Page up">◀</button>
-                    <button
-                        class="key enter" class:held={pressed === 'enter'}
-                        onclick={() => press('enter')}
-                        onpointerdown={() => { if (view === 'erase') { pressed = 'enter'; startErase(); } }}
-                        onpointerup={stopErase}
-                        onpointerleave={stopErase}
-                    >ENTER</button>
-                    <button class="key arrow right" class:held={pressed === 'right'} onclick={() => press('right')} aria-label="Page down">▶</button>
-                    <button class="key arrow down" class:held={pressed === 'down'} onclick={() => press('down')} aria-label="Down">▼</button>
-                </div>
-
-                <div class="side">
-                    <button class="key wide" onclick={() => go('info')}>INFO</button>
-                    <button class="key wide" onclick={close}>UNPLUG</button>
-                </div>
-            </div>
-
-            <div class="footer">
-                <span class="port"></span>
-                <span class="footnote">ARROWS MOVE &middot; ENTER SELECTS &middot; BACK RETURNS</span>
-            </div>
-        </div>
     </div>
+{/snippet}
+
+<div class="overlay">
+    <!--
+        One firmware, three instruments. The chassis owns the case, the bezel and
+        the buttons; the screen snippet above is the same code on all three, so a
+        change to the firmware lands on every device at once.
+    -->
+    <svelte:component
+        this={chassis}
+        {screen} {press} {pressed} {device} {lex} {scan} {eraseKey}
+        {softKeys} {lamps} {view} {holdStart} {holdEnd}
+    />
 </div>
 
 <style>
-    .device { position: relative; }
-
-    /* Cable running off the top of the frame, towards the OBD port. */
-    .cable {
-        position: absolute;
-        left: -80px; top: -186px;
-        width: 260px; height: 200px;
-        pointer-events: none;
-        overflow: visible;
-    }
-    .cable path {
-        fill: none;
-        stroke: #0b1a2b;
-        stroke-width: 11;
-        stroke-linecap: round;
-    }
-    .cable path.sheen {
-        stroke: rgba(30, 166, 240, 0.22);
-        stroke-width: 3;
-        transform: translateX(-2.5px);
-    }
-
-    .shell {
-        position: relative;
-        width: 470px;
-        padding: 16px 18px 14px;
-        border-radius: 26px;
-        background: linear-gradient(165deg, #0d1e33 0%, #061020 55%, #030a14 100%);
-        border: 1px solid var(--line-strong);
-        box-shadow: var(--shadow), var(--glow), inset 0 1px 0 rgba(30, 166, 240, 0.18);
-    }
-
-    .brandbar { display: flex; align-items: center; gap: 10px; padding: 0 4px 12px; }
-    .brand { font-family: var(--mono); font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: var(--text); }
-    .brand-num { color: var(--accent); }
-    .brand-sub { font-size: 9px; letter-spacing: 0.14em; color: var(--text-faint); flex: 1; }
-    .mil {
-        font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em;
-        border: 1px solid var(--line); border-radius: 3px; padding: 2px 6px;
-        color: var(--text-faint);
-    }
-    .mil.on {
-        color: #ffb454; border-color: #7a5518; background: rgba(255, 180, 84, 0.12);
-        box-shadow: 0 0 12px rgba(255, 180, 84, 0.35);
-    }
-
-    /* --- the screen --- */
-    .lcd {
-        position: relative;
-        border-radius: 8px;
-        padding: 10px 12px;
-        background: #020a12;
-        border: 1px solid rgba(30, 166, 240, 0.35);
-        box-shadow: inset 0 0 30px rgba(30, 166, 240, 0.12), 0 0 22px rgba(30, 166, 240, 0.10);
-        overflow: hidden;
-    }
+    /*
+     * Only the screen is styled here. The case, bezel and buttons belong to the
+     * chassis components, which also set the --lcd-* tokens below - that is how
+     * one firmware renders on a cheap car reader, a flight-line test set and a
+     * sealed marine box without the markup knowing which it is on.
+     */
     .glass {
         position: relative;
-        height: 232px;
+        height: var(--lcd-height, 232px);
         font-family: var(--mono);
-        font-size: 12px;
+        font-size: var(--lcd-size, 12px);
         line-height: 1.55;
-        color: #8fe3ff;
-        text-shadow: 0 0 6px rgba(30, 166, 240, 0.55);
+        color: var(--lcd-ink, #8fe3ff);
+        text-shadow: 0 0 6px var(--lcd-glow, rgba(30, 166, 240, 0.55));
         display: flex;
         flex-direction: column;
         gap: 1px;
     }
-    /* Faint horizontal banding, the way a backlit character display looks. */
-    .scanlines {
-        position: absolute; inset: 0; pointer-events: none;
-        background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px);
-        mix-blend-mode: multiply;
-    }
 
-    .statusbar .index { color: var(--text-faint); letter-spacing: 0.04em; }
     .statusbar {
         display: flex; gap: 8px;
-        border-bottom: 1px solid rgba(30, 166, 240, 0.32);
+        border-bottom: 1px solid var(--lcd-rule, rgba(30, 166, 240, 0.32));
         padding-bottom: 4px; margin-bottom: 5px;
-        color: var(--accent); letter-spacing: 0.08em; font-size: 11px;
+        color: var(--lcd-accent, #1ea6f0);
+        letter-spacing: 0.08em;
+        font-size: calc(var(--lcd-size, 12px) - 1px);
     }
+    .statusbar .index { color: var(--lcd-faint, #5d80a0); letter-spacing: 0.04em; }
 
     .row { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; padding: 0 2px; }
-    .row.active { background: rgba(30, 166, 240, 0.20); color: #eafaff; border-radius: 2px; }
-    .marker { width: 8px; color: var(--accent); }
-    .num { width: 12px; color: var(--text-faint); }
-    .code { min-width: 80px; color: var(--accent); }
+    .row.active { background: var(--lcd-select, rgba(30, 166, 240, 0.20)); color: var(--lcd-bright, #eafaff); border-radius: 2px; }
+    .marker { width: 8px; color: var(--lcd-accent, #1ea6f0); }
+    .num { width: 12px; color: var(--lcd-faint, #5d80a0); }
+    .code { min-width: 80px; color: var(--lcd-accent, #1ea6f0); }
     .text { flex: 1; overflow: hidden; }
-    .tail { color: #cfefff; }
-    .tail.alarm, .alarm { color: #ff8f6b; }
-    .tail.warn { color: #ffd23f; }
-    .sev.high { color: #ff8f6b; }
-    .sev.medium { color: #ffd23f; }
+    .tail { color: var(--lcd-bright, #cfefff); }
+    .tail.alarm, .alarm { color: var(--lcd-alarm, #ff8f6b); }
+    .tail.warn { color: var(--lcd-warn, #ffd23f); }
+    .sev.high { color: var(--lcd-alarm, #ff8f6b); }
+    .sev.medium { color: var(--lcd-warn, #ffd23f); }
 
     .kv { display: flex; gap: 8px; padding: 1px 2px; }
-    .kv span { width: 68px; color: var(--text-faint); flex: none; }
-    .kv b { font-weight: 400; color: #cfefff; }
+    .kv span { width: 68px; color: var(--lcd-faint, #5d80a0); flex: none; }
+    .kv b { font-weight: 400; color: var(--lcd-bright, #cfefff); }
     .kv.where { align-items: flex-start; }
     .kv.where b div { line-height: 1.45; }
 
-    .desc { padding: 3px 2px; color: #cfefff; white-space: normal; line-height: 1.5; }
-    .desc.dim { color: #6f9cba; font-size: 11px; }
-    .rule { border-top: 1px dashed rgba(30, 166, 240, 0.3); margin: 5px 0; }
-    .centre { text-align: center; margin: auto 0; font-size: 14px; letter-spacing: 0.08em; }
-    .hint { margin-top: auto; text-align: center; color: var(--text-faint); font-size: 10px; letter-spacing: 0.1em; }
+    .desc { padding: 3px 2px; color: var(--lcd-bright, #cfefff); white-space: normal; line-height: 1.5; }
+    .desc.dim { color: var(--lcd-faint, #6f9cba); font-size: calc(var(--lcd-size, 12px) - 1px); }
+    .rule { border-top: 1px dashed var(--lcd-rule, rgba(30, 166, 240, 0.3)); margin: 5px 0; }
+    .centre { text-align: center; margin: auto 0; font-size: calc(var(--lcd-size, 12px) + 2px); letter-spacing: 0.08em; }
+    .hint { margin-top: auto; text-align: center; color: var(--lcd-faint, #5d80a0); font-size: 10px; letter-spacing: 0.1em; }
+
     .boot .line { letter-spacing: 0.06em; }
     .caret { animation: blink 1s steps(1) infinite; }
     .blink { animation: blink 1.1s steps(1) infinite; }
     @keyframes blink { 50% { opacity: 0.25; } }
 
-    .holdbar { height: 8px; margin: 10px 2px 6px; background: rgba(30, 166, 240, 0.12); border-radius: 4px; overflow: hidden; }
-    .holdbar .fill { height: 100%; background: #ff8f6b; box-shadow: 0 0 12px rgba(255, 143, 107, 0.7); }
+    .holdbar {
+        height: 8px; margin: 10px 2px 6px;
+        background: var(--lcd-select, rgba(30, 166, 240, 0.12));
+        border-radius: 4px; overflow: hidden;
+    }
+    .holdbar .fill {
+        height: 100%;
+        background: var(--lcd-alarm, #ff8f6b);
+        box-shadow: 0 0 12px var(--lcd-alarm, rgba(255, 143, 107, 0.7));
+    }
 
     .toast {
         position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%);
-        background: rgba(30, 166, 240, 0.2); border: 1px solid var(--accent);
-        border-radius: 3px; padding: 2px 10px; font-size: 10px; letter-spacing: 0.1em; color: #eafaff;
+        background: var(--lcd-select, rgba(30, 166, 240, 0.2));
+        border: 1px solid var(--lcd-accent, #1ea6f0);
+        border-radius: 3px; padding: 2px 10px;
+        font-size: 10px; letter-spacing: 0.1em; color: var(--lcd-bright, #eafaff);
     }
-
-    /* --- the keypad --- */
-    .keypad { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; margin-top: 16px; }
-    .side { display: flex; flex-direction: column; gap: 9px; }
-
-    .key {
-        font-family: var(--mono);
-        font-size: 11px;
-        letter-spacing: 0.08em;
-        color: #d6ecfa;
-        background: linear-gradient(180deg, #16304c 0%, #0b1c30 100%);
-        border: 1px solid rgba(30, 166, 240, 0.30);
-        border-bottom-color: rgba(0, 0, 0, 0.6);
-        border-radius: 7px;
-        padding: 10px 12px;
-        box-shadow: 0 3px 0 rgba(2, 8, 16, 0.85), inset 0 1px 0 rgba(140, 210, 255, 0.14);
-        transition: transform 0.06s ease, box-shadow 0.06s ease, background 0.12s ease;
-    }
-    .key:hover { background: linear-gradient(180deg, #1c3d61 0%, #0e2540 100%); box-shadow: 0 3px 0 rgba(2, 8, 16, 0.85), 0 0 14px rgba(30, 166, 240, 0.28); }
-    /* Physical travel: the button actually goes down. */
-    .key:active, .key.held {
-        transform: translateY(3px);
-        box-shadow: 0 0 0 rgba(2, 8, 16, 0.85), inset 0 2px 6px rgba(0, 0, 0, 0.6);
-        background: linear-gradient(180deg, #0c1e33 0%, #081524 100%);
-        color: var(--accent);
-    }
-    .key.wide { width: 100%; }
-    .key.danger { color: #ffb0a0; border-color: rgba(255, 107, 107, 0.35); }
-    .key.danger:hover { box-shadow: 0 3px 0 rgba(2, 8, 16, 0.85), 0 0 14px rgba(255, 107, 107, 0.3); }
-
-    .dpad {
-        display: grid;
-        grid-template-columns: repeat(3, 44px);
-        grid-template-rows: repeat(3, 40px);
-        gap: 5px;
-    }
-    .key.arrow { padding: 0; font-size: 13px; display: grid; place-items: center; }
-    .arrow.up { grid-area: 1 / 2; }
-    .arrow.left { grid-area: 2 / 1; }
-    .arrow.right { grid-area: 2 / 3; }
-    .arrow.down { grid-area: 3 / 2; }
-    .key.enter {
-        grid-area: 2 / 2;
-        padding: 0;
-        font-size: 10px;
-        border-radius: 50%;
-        color: #02121f;
-        background: linear-gradient(180deg, var(--accent) 0%, var(--accent-deep) 100%);
-        border-color: var(--accent);
-        box-shadow: 0 3px 0 rgba(2, 8, 16, 0.85), var(--glow);
-    }
-    .key.enter:hover { background: linear-gradient(180deg, #47bcff 0%, #1470cc 100%); }
-    .key.enter:active, .key.enter.held {
-        transform: translateY(3px);
-        background: linear-gradient(180deg, #1470cc 0%, #0b4f92 100%);
-        color: #02121f;
-        box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
-    }
-
-    .footer { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 0 4px; }
-    .port { width: 44px; height: 6px; border-radius: 3px; background: #071626; box-shadow: inset 0 0 0 1px rgba(30, 166, 240, 0.2); }
-    .footnote { font-size: 9px; letter-spacing: 0.1em; color: var(--text-faint); }
 </style>

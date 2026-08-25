@@ -16,8 +16,32 @@ one you should have brought.
 | `bite_tester` | AV-4 | helicopters, aircraft | ARINC 429 |
 | `marine_diagnostic` | MD-2 | boats | SAE J1939 |
 
-They do not just differ by which vehicles they accept — each carries its own
-vocabulary, because the trades do not use the same words:
+They are not one device with a filter. Each is modelled on the real instrument
+its trade actually uses, so they look and handle differently:
+
+**AGM-9000** — the consumer code reader (Autel AutoLink, Innova, Launch Creader).
+Portrait body with moulded rubber side grips, a hardwired lead straight out of
+the top, three colour-coded readiness lamps above the screen — PASS / PEND / MIL,
+which light from the live scan state — a round D-pad with ENTER in the middle,
+and the one-touch I/M readiness key these tools are sold on. Speaker grille and
+USB along the bottom edge.
+
+**AV-4** — the avionics flight-line test set (IFR 4000, Barfield ramp testers).
+Landscape ruggedised case in aviation hazard yellow corner bumpers, with a
+folding carry handle and MIL-spec circular bayonet connectors on the top panel
+rather than a car plug. Its defining feature is **five soft keys** in a row under
+the display, labelled by text *on the glass* directly above them that changes
+with the page. Separate arrow cluster, function keys, PWR and CAUTION lamps, and
+a calibration-due plate — because these live on a cal schedule.
+
+**MD-2** — the sealed marine reader (Volvo Penta Vodia, Diacom, the diesel
+handhelds). Squat gasketed case with a visible seam and four sealing screws, an
+IP67 badge printed on the shell, and big widely-spaced keys meant for wet hands
+and gloves. A black Deutsch 9-pin sits under a hinged weather flap — black is the
+J1939 250k keying, which is exactly what this tool reports — and there is a
+lanyard ear on the case, because everything on a boat is tied to something.
+
+They also differ in what they say, because the trades do not use the same words:
 
 | AGM-9000 | AV-4 | MD-2 |
 | --- | --- | --- |
@@ -30,10 +54,25 @@ vocabulary, because the trades do not use the same words:
 | FREEZE FRAME | SNAPSHOT | SNAPSHOT |
 | I/M MONITORS | BITE STATUS | SELF TEST |
 
+And the screens differ too: a small backlit colour TFT on the AGM-9000, a larger
+amber-accented instrument display on the AV-4, and a high-contrast near-white
+transflective panel on the MD-2 for reading in direct sun.
+
 The device table lives at the bottom of `config/dtc.js`. Its `blueprints` field
 decides what each tool accepts, so merging aircraft and marine into one box — or
 splitting helicopters off from fixed-wing — is a one-line edit. Nothing else
 needs changing: the firmware reads its labels off `lexicon`.
+
+### How the three share one firmware
+
+`web/src/screens/Scanner.svelte` holds all the logic and renders the screen as a
+Svelte snippet. Each chassis in `web/src/lib/chassis/` draws its own case, bezel
+and buttons around that snippet and sets the `--lcd-*` tokens that tint it. So a
+change to the firmware lands on all three devices at once, while each keeps its
+own physical character. A chassis needs only to call the `press()` actions —
+`up`, `down`, `left`, `right`, `enter`, `back`, `erase`, plus optional
+`readiness` and `info` — and wire `holdStart` / `holdEnd` to its ENTER key for
+the press-and-hold erase.
 
 ## What it can and cannot see
 
