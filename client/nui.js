@@ -114,7 +114,7 @@ const ALLOWED_RPC = [
     'upgrades:list', 'upgrades:install',
     'repair:field', 'repair:mobile', 'repair:workshop', 'repair:service', 'repair:triage',
     'diagnose:last',
-    'scanner:scan', 'scanner:live', 'scanner:freeze', 'scanner:erase',
+    'scanner:scan', 'scanner:live', 'scanner:freeze',
 ];
 
 RegisterNuiCallbackType('rpc');

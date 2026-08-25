@@ -105,7 +105,6 @@ AGM.scanner.run = async function (vehicle) {
 
         AGM.nui.show('scanner', {
             scan: result.scan,
-            canErase: AGM.Config.scanner.allowErase,
             liveInterval: AGM.Config.scanner.liveInterval,
         }, { vehicle: info });
 

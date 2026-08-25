@@ -8,11 +8,14 @@
      *   - three colour-coded readiness LEDs above the screen, green/amber/red
      *   - a round D-pad with ENTER in the middle, the shape everyone knows
      *   - a one-touch readiness key, the feature these tools are sold on
+     *
+     * There is no clear-codes key: codes come off the vehicle's condition, so
+     * repairing a part clears them and nothing else does.
      *   - speaker grille and USB socket along the bottom edge
      */
     import { close } from '../nui.js';
 
-    let { screen, press, pressed, device, lex, eraseKey, lamps, holdStart, holdEnd } = $props();
+    let { screen, press, pressed, device, lex, lamps } = $props();
 </script>
 
 <div class="reader">
@@ -68,14 +71,11 @@
                 <button
                     class="enter" class:held={pressed === 'enter'}
                     onclick={() => press('enter')}
-                    onpointerdown={holdStart}
-                    onpointerup={holdEnd}
-                    onpointerleave={holdEnd}
                 >ENTER</button>
             </div>
 
-            <button class="btn soft" class:held={pressed === 'erase'} onclick={() => press('erase')}>
-                {eraseKey}
+            <button class="btn soft" onclick={() => press('info')}>
+                INFO
             </button>
         </div>
 

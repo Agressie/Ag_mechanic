@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS ag_mechanic_vehicles (
     health        LONGTEXT     NULL,                -- JSON: { component: 0-100 }
     tiers         LONGTEXT     NULL,                -- JSON: { category: tierIndex }
     symptoms      LONGTEXT     NULL,                -- JSON: recent wear sources
-    scanner       LONGTEXT     NULL,                -- JSON: { clearedAt, clearedOdo }
     odometer      DOUBLE       NOT NULL DEFAULT 0,  -- metres
     updated_at    BIGINT       NOT NULL DEFAULT 0,
     PRIMARY KEY (vehicle_key),

@@ -97,18 +97,16 @@ AGM.scanner.resolveLocation = function (record, componentId) {
 /**
  * Every code currently set on a vehicle.
  *
+ * Codes are derived from component health rather than stored, which means they
+ * look after themselves: repair a part and its codes are simply not generated
+ * on the next read. There is nothing to erase, because nothing was written
+ * down - the vehicle's condition is the record.
+ *
  * `stored` codes are confirmed faults with the light on; `pending` ones have
- * been seen but not confirmed over enough drive cycles. Clearing codes drops
- * everything back to pending until the vehicle has been driven far enough for
- * the fault to re-confirm - which is exactly the loophole a dishonest garage
- * would use before a sale.
+ * been seen but are not yet bad enough to confirm.
  */
 AGM.scanner.codes = function (record) {
     const blueprint = record.blueprint;
-    const cleared = record.scanner || { clearedAt: 0, clearedOdo: 0 };
-    const sinceCleared = Math.max(0, record.odometer - (cleared.clearedOdo || 0));
-    const reconfirmed = !cleared.clearedAt || sinceCleared >= AGM.Config.scanner.reconfirmMetres;
-
     const out = [];
 
     for (const comp of AGM.Components.list(blueprint)) {
@@ -128,10 +126,8 @@ AGM.scanner.codes = function (record) {
                 code: location.fill(code.code),
                 desc: location.fill(code.desc),
                 severity: code.severity,
-                /* Some faults are not specific to one cylinder or corner. */
-                /* Only a confirmed fault turns the light on, and only once it
-                   has re-confirmed since the codes were last cleared. */
-                status: confirmed && reconfirmed ? 'stored' : 'pending',
+                /* Only a fault bad enough to need work turns the light on. */
+                status: confirmed ? 'stored' : 'pending',
                 component: comp.id,
                 componentLabel: comp.label,
                 module: entry.module,
@@ -301,24 +297,18 @@ AGM.scanner.freezeFrame = function (record, componentId) {
 
 /** Readiness monitors, in the shape a scanner shows them. */
 AGM.scanner.monitors = function (record, codes) {
-    const cleared = record.scanner || {};
-    const since = Math.max(0, record.odometer - (cleared.clearedOdo || 0));
-    /* Clearing codes resets the monitors, and they take driving to come back. */
-    const incomplete = cleared.clearedAt && since < AGM.Config.scanner.reconfirmMetres;
-
     const failed = new Set(codes.filter((c) => c.status === 'stored').map((c) => c.module));
+    const state = (bad) => (bad ? 'failed' : 'ready');
 
     return [
-        { id: 'MIS', label: 'Misfire', state: monitorState(incomplete, failed.has('ECM')) },
-        { id: 'FUE', label: 'Fuel system', state: monitorState(incomplete, failed.has('ECM')) },
-        { id: 'CCM', label: 'Comprehensive components', state: monitorState(incomplete, failed.size > 0) },
-        { id: 'CAT', label: 'Catalyst', state: monitorState(incomplete, failed.has('ECM')) },
-        { id: 'EVP', label: 'Evaporative system', state: monitorState(incomplete, false) },
-        { id: 'O2S', label: 'Oxygen sensor', state: monitorState(incomplete, failed.has('ECM')) },
+        { id: 'MIS', label: 'Misfire', state: state(failed.has('ECM')) },
+        { id: 'FUE', label: 'Fuel system', state: state(failed.has('ECM')) },
+        { id: 'CCM', label: 'Comprehensive components', state: state(failed.size > 0) },
+        { id: 'CAT', label: 'Catalyst', state: state(failed.has('ECM')) },
+        { id: 'EVP', label: 'Evaporative system', state: state(false) },
+        { id: 'O2S', label: 'Oxygen sensor', state: state(failed.has('ECM')) },
     ];
 };
-
-const monitorState = (incomplete, failed) => (incomplete ? 'incomplete' : failed ? 'failed' : 'ready');
 
 /** The full payload the scanner UI runs on. */
 AGM.scanner.buildScan = function (record) {
@@ -347,7 +337,6 @@ AGM.scanner.buildScan = function (record) {
         live: AGM.scanner.liveData(record),
         monitors: AGM.scanner.monitors(record, codes),
         calibration: `AGM-${(hash(record.key) % 900000 + 100000)}`,
-        clearedAt: (record.scanner || {}).clearedAt || 0,
     };
 };
 
@@ -446,33 +435,3 @@ AGM.rpc.register('scanner:freeze', async (src, args) => {
     return { ok: true, frame: AGM.scanner.freezeFrame(ctx.record, componentId) };
 });
 
-/**
- * Clears stored codes. This repairs precisely nothing - it turns the light off
- * and resets the monitors, and the fault re-confirms as soon as the vehicle has
- * been driven far enough. Logged, because it is exactly the trick somebody pulls
- * before selling a car.
- */
-AGM.rpc.register('scanner:erase', async (src, args) => {
-    if (!AGM.Config.scanner.allowErase) return { ok: false, reason: 'eraseDisabled' };
-
-    const ctx = await AGM.diagnose.resolveVehicle(src, args);
-    if (ctx.error) return { ok: false, reason: ctx.error };
-
-    const refusal = deviceCheck(src, ctx.record.blueprint);
-    if (refusal) return refusal;
-
-    const { player, record } = ctx;
-    if (AGM.Config.scanner.eraseRequiresJob && player.job.name !== AGM.Config.job.name) {
-        return { ok: false, reason: 'noJob' };
-    }
-
-    const before = AGM.scanner.codes(record).filter((c) => c.status === 'stored').length;
-
-    record.scanner = { clearedAt: Date.now(), clearedOdo: record.odometer };
-    record.dirty = true;
-    await AGM.vehicles.saveNow(record.key);
-
-    AGM.db.log('', player.name, 'scanner_erase', { plate: record.plate, cleared: before });
-
-    return { ok: true, cleared: before, scan: AGM.scanner.buildScan(record) };
-});

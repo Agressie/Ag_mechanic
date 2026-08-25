@@ -189,31 +189,6 @@ export function devRpc(name) {
                 { label: 'Module voltage', value: 12.6, unit: 'V' },
             ] };
 
-        case 'scanner:erase': {
-            const scan = devScanner().scan;
-            return {
-                ok: true,
-                cleared: scan.counts.stored,
-                scan: {
-                    ...scan,
-                    mil: false,
-                    counts: { stored: 0, pending: scan.codes.length },
-                    codes: scan.codes.map((c) => ({ ...c, status: 'pending' })),
-                    modules: scan.modules.map((m) => ({
-                        ...m,
-                        stored: 0,
-                        pending: m.stored + m.pending,
-                        parts: m.parts.map((part) => ({
-                            ...part,
-                            status: part.codes.length ? 'pending' : 'ok',
-                            codes: part.codes.map((c) => ({ ...c, status: 'pending' })),
-                        })),
-                    })),
-                    monitors: scan.monitors.map((m) => ({ ...m, state: 'incomplete' })),
-                },
-            };
-        }
-
         case 'shop:orders':
             return {
                 ok: true, canOrder: true, deliveryActive: false,
@@ -237,7 +212,7 @@ export function devRpc(name) {
 const DEVICE_FIXTURES = {
     obd: {
         device: { id: 'obd', label: 'OBD-II Scan Tool', model: 'AGM-9000', bus: 'OBD-II / CAN',
-            lexicon: { codes: 'STORED CODES', pending: 'PENDING CODES', systems: 'SYSTEM SCAN', system: 'MODULE', code: 'CODE', erase: 'ERASE CODES', lamp: 'MIL', live: 'LIVE DATA', frame: 'FREEZE FRAME', monitors: 'I/M MONITORS' } },
+            lexicon: { codes: 'STORED CODES', pending: 'PENDING CODES', systems: 'SYSTEM SCAN', system: 'MODULE', code: 'CODE', lamp: 'MIL', live: 'LIVE DATA', frame: 'FREEZE FRAME', monitors: 'I/M MONITORS' } },
         plate: 'AG 44 XZ', vin: 'J1JGMAAU6HR7SLLKK', blueprintLabel: 'Automobile',
         protocol: 'ISO 15765-4 CAN 11/500', calibration: 'AGM-482913', odometer: 48213,
         parts: [
@@ -270,7 +245,7 @@ const DEVICE_FIXTURES = {
 
     bite: {
         device: { id: 'bite', label: 'Avionics BITE Test Set', model: 'AV-4', bus: 'ARINC 429',
-            lexicon: { codes: 'ACTIVE FAULTS', pending: 'INTERMITTENT', systems: 'LRU SCAN', system: 'LRU', code: 'FAULT', erase: 'CLEAR FAULT LOG', lamp: 'CAUTION', live: 'PARAMETERS', frame: 'SNAPSHOT', monitors: 'BITE STATUS' } },
+            lexicon: { codes: 'ACTIVE FAULTS', pending: 'INTERMITTENT', systems: 'LRU SCAN', system: 'LRU', code: 'FAULT', lamp: 'CAUTION', live: 'PARAMETERS', frame: 'SNAPSHOT', monitors: 'BITE STATUS' } },
         plate: 'HELI 001', vin: '92RPVS6A5YDTN1BCF', blueprintLabel: 'Rotorcraft',
         protocol: 'ARINC 429 / BITE', calibration: 'AGM-731204', odometer: 1284,
         parts: [
@@ -297,7 +272,7 @@ const DEVICE_FIXTURES = {
 
     marine: {
         device: { id: 'marine', label: 'Marine Diagnostic Tool', model: 'MD-2', bus: 'SAE J1939',
-            lexicon: { codes: 'ACTIVE DTCs', pending: 'INACTIVE DTCs', systems: 'ECU SCAN', system: 'ECU', code: 'DTC', erase: 'RESET DTCs', lamp: 'WARN', live: 'LIVE DATA', frame: 'SNAPSHOT', monitors: 'SELF TEST' } },
+            lexicon: { codes: 'ACTIVE DTCs', pending: 'INACTIVE DTCs', systems: 'ECU SCAN', system: 'ECU', code: 'DTC', lamp: 'WARN', live: 'LIVE DATA', frame: 'SNAPSHOT', monitors: 'SELF TEST' } },
         plate: 'BOAT 001', vin: '9BKY41UYV9GEKD8X4', blueprintLabel: 'Watercraft',
         protocol: 'SAE J1939 250k', calibration: 'AGM-114528', odometer: 3140,
         parts: [
@@ -368,14 +343,12 @@ function buildFixture(key) {
             { id: 'EVP', label: 'Evaporative system', state: 'ready' },
             { id: 'O2S', label: 'Oxygen sensor', state: 'failed' },
         ],
-        clearedAt: 0,
     };
 }
 
 const currentDevice = () => new URLSearchParams(window.location.search).get('device') || 'obd';
 
 export const devScanner = () => ({
-    canErase: true,
     liveInterval: 900,
     scan: buildFixture(currentDevice()),
 });

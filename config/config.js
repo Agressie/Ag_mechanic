@@ -100,11 +100,9 @@ AGM.Config = {
         /* A scan's findings stay usable for this long (ms). */
         linkTtl: 10 * 60 * 1000,
 
-        /* Erasing codes turns the light off. It repairs nothing, and a fault
-           re-confirms once the vehicle has been driven this far again. */
-        allowErase: true,
-        eraseRequiresJob: false,
-        reconfirmMetres: 2000,
+        /* There is no "clear codes" button, and deliberately so: codes are
+           derived from the vehicle's condition, so repairing a part clears its
+           codes by itself and nothing else can. */
 
         /* Live data refresh interval in the device UI (ms). */
         liveInterval: 900,

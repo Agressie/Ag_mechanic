@@ -173,7 +173,7 @@ step('dtc -> components');
 
 step('diagnostic devices');
 {
-    const LEXICON_KEYS = ['codes', 'pending', 'systems', 'system', 'code', 'erase', 'lamp', 'live', 'frame', 'monitors'];
+    const LEXICON_KEYS = ['codes', 'pending', 'systems', 'system', 'code', 'lamp', 'live', 'frame', 'monitors'];
     const claimed = new Map();
 
     for (const device of AGM.Dtc.devices) {

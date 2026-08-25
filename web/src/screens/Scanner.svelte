@@ -18,13 +18,12 @@
     let { payload = {} } = $props();
 
     let scan = $state(payload.scan || { codes: [], modules: [], live: [], monitors: [], counts: {} });
-    const canErase = $derived(payload.canErase !== false);
 
     /* The three tools do not use the same words for the same things, so every
        label on the device comes from its own lexicon. */
     const FALLBACK_LEXICON = {
         codes: 'STORED CODES', pending: 'PENDING CODES', systems: 'SYSTEM SCAN',
-        system: 'MODULE', code: 'CODE', erase: 'ERASE CODES', lamp: 'MIL',
+        system: 'MODULE', code: 'CODE', lamp: 'MIL',
         live: 'LIVE DATA', frame: 'FREEZE FRAME', monitors: 'I/M MONITORS',
     };
     const device = $derived(scan.device || { model: 'AGM-9000', bus: 'OBD-II / CAN', lexicon: FALLBACK_LEXICON });
@@ -42,8 +41,6 @@
     let openPart = $state(null);
     let openCode = $state(null);
     let frame = $state(null);
-    let eraseHeld = $state(0);
-    let erasedCount = $state(0);
     let pressed = $state(null);
 
     const ROWS = 7;
@@ -56,7 +53,6 @@
         { id: 'freeze', label: lex.frame },
         { id: 'info', label: 'VEHICLE INFO' },
         { id: 'monitors', label: lex.monitors },
-        { id: 'erase', label: lex.erase },
     ]);
 
     const stored = $derived(scan.codes.filter((c) => c.status === 'stored'));
@@ -166,7 +162,6 @@
                 if (!worst) return beep('NO CODES TO FRAME');
                 return openFreeze(worst.component);
             }
-            if (choice.id === 'erase' && !canErase) return beep('ERASE DISABLED');
             return go(choice.id);
         }
 
@@ -197,43 +192,11 @@
         }
 
         if (view === 'code' && openCode) return openFreeze(openCode.component);
-
-        if (view === 'erased') return go('menu', false);
     }
 
     function beep(message) {
         status = message;
         setTimeout(() => { if (status === message) status = ''; }, 1600);
-    }
-
-    /* --- erase ---------------------------------------------------------- */
-    let eraseTimer = null;
-
-    function startErase() {
-        if (view !== 'erase' || eraseTimer) return;
-        const started = Date.now();
-        eraseTimer = setInterval(async () => {
-            eraseHeld = Math.min(1, (Date.now() - started) / 3000);
-            if (eraseHeld < 1) return;
-
-            stopErase();
-            view = 'erasing';
-            const result = await vehicleRpc('scanner:erase', {});
-            if (result && result.ok) {
-                erasedCount = result.cleared;
-                scan = result.scan;
-                view = 'erased';
-            } else {
-                view = 'erase';
-                beep(result && result.reason === 'noItem' ? 'SCANNER NOT PRESENT' : 'ERASE FAILED');
-            }
-        }, 50);
-    }
-
-    function stopErase() {
-        if (eraseTimer) clearInterval(eraseTimer);
-        eraseTimer = null;
-        eraseHeld = 0;
     }
 
     /* --- input ---------------------------------------------------------- */
@@ -248,13 +211,12 @@
             case 'right': return move(ROWS);
             case 'enter': return select();
             case 'back': return back();
-            case 'erase':
-                if (!canErase) return beep('ERASE DISABLED');
-                return view === 'erase' ? undefined : go('erase');
             case 'readiness':
                 return view === 'monitors' ? undefined : go('monitors');
             case 'info':
                 return view === 'info' ? undefined : go('info');
+            case 'live':
+                return view === 'live' ? undefined : go('live');
             default:
                 return undefined;
         }
@@ -262,7 +224,7 @@
 
     const KEYS = {
         ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-        Enter: 'enter', Space: 'enter', Backspace: 'back', Escape: 'back', Delete: 'erase',
+        Enter: 'enter', Space: 'enter', Backspace: 'back', Escape: 'back',
     };
 
     function onKeyDown(event) {
@@ -270,21 +232,12 @@
         if (!button) return;
         event.preventDefault();
 
-        if (button === 'enter' && view === 'erase') {
-            if (event.repeat) return;
-            pressed = 'enter';
-            return startErase();
-        }
         if (event.repeat && button !== 'up' && button !== 'down') return;
         press(button);
     }
 
     function onKeyUp(event) {
-        const button = KEYS[event.code] || KEYS[event.key];
-        if (button === 'enter') {
-            pressed = null;
-            stopErase();
-        }
+        if ((KEYS[event.code] || KEYS[event.key]) === 'enter') pressed = null;
     }
 
     $effect(() => {
@@ -293,7 +246,6 @@
         return () => {
             window.removeEventListener('keydown', onKeyDown);
             window.removeEventListener('keyup', onKeyUp);
-            stopErase();
         };
     });
 
@@ -305,10 +257,6 @@
 
     const window7 = $derived(list.slice(top, top + ROWS));
 
-    /* The keypad is silkscreened in the device's own language: ERASE on a car
-       tool, CLEAR on a BITE set, RESET on a marine reader. */
-    const eraseKey = $derived(lex.erase.split(' ')[0]);
-
     /*
      * Five soft keys, the way a flight-line test set works: the labels live on
      * the screen directly above the physical buttons, and change with the page.
@@ -318,15 +266,14 @@
             : view === 'systems' ? 'OPEN'
                 : view === 'systemParts' ? 'DETAIL'
                     : view === 'part' ? 'OPEN'
-                        : view === 'erase' ? 'HOLD'
-                            : view === 'boot' || view === 'link' ? 'CONT'
-                                : 'SELECT';
+                        : view === 'boot' || view === 'link' ? 'CONT'
+                            : 'SELECT';
         return [
             { label: stack.length || view !== 'menu' ? 'BACK' : 'EXIT', action: 'back' },
             { label: 'UP', action: 'up' },
             { label: 'DOWN', action: 'down' },
             { label: enter, action: 'enter' },
-            { label: eraseKey, action: 'erase' },
+            { label: 'SETUP', action: 'info' },
         ];
     });
 
@@ -336,17 +283,6 @@
         amber: pending.length > 0 && !scan.mil,
         red: scan.mil,
     });
-
-    /* Press-and-hold on ENTER, used by the erase confirmation. Handed to the
-       chassis so each one can wire it to its own physical key. */
-    function holdStart() {
-        if (view !== 'erase') return;
-        pressed = 'enter';
-        startErase();
-    }
-    function holdEnd() {
-        stopErase();
-    }
 
     const chassis = $derived(
         device.id === 'bite' ? BiteChassis : device.id === 'marine' ? MarineChassis : ObdChassis,
@@ -377,9 +313,6 @@
         freeze: lex.frame,
         info: 'VEHICLE INFO',
         monitors: lex.monitors,
-        erase: lex.erase,
-        erasing: 'CLEARING',
-        erased: 'DONE',
     });
 
     /* Word-wraps the "where" text onto the LCD without breaking words. */
@@ -481,23 +414,6 @@
                         <div class="kv"><span>ODOMETER</span><b>{scan.odometer.toLocaleString('en-US')} km</b></div>
                         <div class="kv"><span>MIL</span><b class:alarm={scan.mil}>{scan.mil ? 'ON' : 'OFF'}</b></div>
 
-                    {:else if view === 'erase'}
-                        <div class="statusbar"><span>{lex.erase}</span><span class="spacer"></span><span class="alarm">CAUTION</span></div>
-                        <div class="desc">Clears {stored.length} {lex.code.toLowerCase()}{stored.length === 1 ? '' : 's'} and resets the monitors.</div>
-                        <div class="desc dim">It does not repair anything. The fault will set again once the vehicle has been driven.</div>
-                        <div class="holdbar"><div class="fill" style="width:{eraseHeld * 100}%"></div></div>
-                        <div class="hint blink">HOLD ENTER TO CONFIRM</div>
-
-                    {:else if view === 'erasing'}
-                        <div class="statusbar"><span>{lex.erase}</span><span class="spacer"></span><span>BUSY</span></div>
-                        <div class="centre blink">CLEARING {lex.code}S...</div>
-
-                    {:else if view === 'erased'}
-                        <div class="statusbar"><span>{lex.erase}</span><span class="spacer"></span><span>DONE</span></div>
-                        <div class="centre">{erasedCount} {lex.code}{erasedCount === 1 ? '' : 'S'} CLEARED</div>
-                        <div class="desc dim">Monitors reset. Faults will re-confirm once it has been used again.</div>
-                        <div class="hint">[ENTER] MAIN MENU</div>
-
                     {:else}
                         <div class="statusbar">
                             <span>{TITLES[view] || ''}</span>
@@ -570,8 +486,7 @@
     -->
     <svelte:component
         this={chassis}
-        {screen} {press} {pressed} {device} {lex} {scan} {eraseKey}
-        {softKeys} {lamps} {view} {holdStart} {holdEnd}
+        {screen} {press} {pressed} {device} {lex} {scan} {softKeys} {lamps} {view}
     />
 </div>
 
@@ -633,17 +548,6 @@
     .caret { animation: blink 1s steps(1) infinite; }
     .blink { animation: blink 1.1s steps(1) infinite; }
     @keyframes blink { 50% { opacity: 0.25; } }
-
-    .holdbar {
-        height: 8px; margin: 10px 2px 6px;
-        background: var(--lcd-select, rgba(30, 166, 240, 0.12));
-        border-radius: 4px; overflow: hidden;
-    }
-    .holdbar .fill {
-        height: 100%;
-        background: var(--lcd-alarm, #ff8f6b);
-        box-shadow: 0 0 12px var(--lcd-alarm, rgba(255, 143, 107, 0.7));
-    }
 
     .toast {
         position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%);

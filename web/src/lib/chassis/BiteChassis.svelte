@@ -12,10 +12,13 @@
      *   - MIL-spec circular bayonet connectors on the top panel, not a car plug
      *   - battery state and a certification/calibration plate, because these
      *     things live on a calibration schedule
+     *
+     * No clear-fault-log key: the fault log is the aircraft's condition, so it
+     * clears when the snag is actually fixed.
      */
     import { close } from '../nui.js';
 
-    let { screen, press, pressed, device, lex, scan, softKeys, holdStart, holdEnd } = $props();
+    let { screen, press, pressed, device, lex, scan, softKeys } = $props();
 </script>
 
 <div class="testset">
@@ -55,9 +58,6 @@
                     <button
                         class="sk" class:held={pressed === key.action}
                         onclick={() => press(key.action)}
-                        onpointerdown={key.action === 'enter' ? holdStart : undefined}
-                        onpointerup={key.action === 'enter' ? holdEnd : undefined}
-                        onpointerleave={key.action === 'enter' ? holdEnd : undefined}
                     ></button>
                 {/each}
             </div>
@@ -73,9 +73,7 @@
                 <div class="fnkeys">
                     <button class="fn" onclick={() => press('readiness')}>BITE<em>STATUS</em></button>
                     <button class="fn" onclick={() => press('info')}>SETUP<em>AIRCRAFT</em></button>
-                    <button class="fn warn" class:held={pressed === 'erase'} onclick={() => press('erase')}>
-                        {lex.erase.split(' ')[0]}<em>FAULT LOG</em>
-                    </button>
+                    <button class="fn" onclick={() => press('live')}>PARAM<em>MONITOR</em></button>
                     <button class="fn" onclick={close}>DISC<em>PORT</em></button>
                 </div>
 

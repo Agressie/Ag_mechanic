@@ -105,8 +105,8 @@ sealing screws, an IP67 badge, gloved-hand keys, and a black Deutsch 9-pin under
 a weather flap.
 
 Each speaks its own trade language too — stored codes on modules, active faults
-on LRUs, active DTCs on ECUs — right down to the silkscreen on the erase key.
-Bring the wrong box and it tells you which one you wanted. Codes are
+on LRUs, active DTCs on ECUs. Bring the wrong box and it tells you which one you
+wanted. Codes are
 deterministic: the same car always reports the same cylinder, so scanning twice
 tells you the same story. Full details in [`docs/scanner.md`](docs/scanner.md).
 
@@ -121,10 +121,10 @@ WHERE    Coil pack on cylinder 1, under the
          ignition cover
 ```
 
-Erasing codes turns the light off and repairs nothing: faults drop to pending,
-the monitors read *incomplete*, and everything re-confirms after 2 km of
-driving. It is logged, because it is exactly the trick somebody pulls before
-selling a car.
+There is no clear-codes button. Codes are derived from the vehicle's condition
+rather than stored, so a fault exists exactly as long as the fault does: fit the
+part and its codes stop appearing, fix everything and the lamp goes out by
+itself. No way to make the light go out without doing the work.
 
 **Inspecting by hand** is the minigame, and it finds everything no sensor is
 watching:

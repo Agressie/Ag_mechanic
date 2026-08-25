@@ -11,10 +11,13 @@
      *   - lanyard lug, because everything on a boat is tied to something
      *   - an IP rating badge, printed on the case like the real ones
      *   - high-contrast near-white screen, for reading in direct sun
+     *
+     * No reset key: DTCs are derived from engine condition, so fixing the fault
+     * is what clears them.
      */
     import { close } from '../nui.js';
 
-    let { screen, press, pressed, device, lex, scan, eraseKey, holdStart, holdEnd } = $props();
+    let { screen, press, pressed, device, lex, scan } = $props();
 </script>
 
 <div class="unit">
@@ -54,9 +57,6 @@
                 <button
                     class="mk k-enter" class:held={pressed === 'enter'}
                     onclick={() => press('enter')}
-                    onpointerdown={holdStart}
-                    onpointerup={holdEnd}
-                    onpointerleave={holdEnd}
                 >OK</button>
                 <button class="mk k-right" class:held={pressed === 'right'} onclick={() => press('right')} aria-label="Page down">▶</button>
                 <button class="mk k-down" class:held={pressed === 'down'} onclick={() => press('down')} aria-label="Down">▼</button>
@@ -65,7 +65,7 @@
             <div class="sideblock">
                 <button class="mk wide" class:held={pressed === 'back'} onclick={() => press('back')}>BACK</button>
                 <button class="mk wide" onclick={() => press('readiness')}>TEST</button>
-                <button class="mk wide alert" class:held={pressed === 'erase'} onclick={() => press('erase')}>{eraseKey}</button>
+                <button class="mk wide" onclick={() => press('live')}>DATA</button>
                 <button class="mk wide" onclick={close}>OFF</button>
             </div>
         </div>
@@ -232,7 +232,6 @@
 
     .sideblock { display: grid; grid-template-columns: repeat(2, 84px); gap: 7px; }
     .mk.wide { padding: 12px 0; font-size: 11px; }
-    .mk.wide.alert { border-color: rgba(255, 122, 82, 0.42); color: #ffbda8; }
 
     .footrail { display: flex; align-items: flex-end; gap: 14px; margin-top: 16px; padding: 0 10px 2px; min-height: 40px; }
 

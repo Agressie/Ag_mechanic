@@ -117,7 +117,8 @@ you want the scanner to warn sooner, raise the `at` values; to make it quieter,
 lower them. Setting `ecu: false` on a component hides it from the scanner
 entirely and pushes it onto the hands-on inspection.
 
-See [`scanner.md`](scanner.md) for the placeholder rules and the erase mechanic.
+See [`scanner.md`](scanner.md) for the placeholder rules and how codes clear
+themselves when a part is repaired.
 
 ## Testing without waiting
 

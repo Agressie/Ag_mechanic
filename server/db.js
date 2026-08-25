@@ -39,7 +39,6 @@ const SCHEMA = [
         health        LONGTEXT     NULL,
         tiers         LONGTEXT     NULL,
         symptoms      LONGTEXT     NULL,
-        scanner       LONGTEXT     NULL,
         odometer      DOUBLE       NOT NULL DEFAULT 0,
         updated_at    BIGINT       NOT NULL DEFAULT 0,
         PRIMARY KEY (vehicle_key),
@@ -102,7 +101,7 @@ const SCHEMA = [
  * separately - checked first so re-running is free.
  */
 const ADDED_COLUMNS = [
-    { table: 'ag_mechanic_vehicles', column: 'scanner', definition: 'LONGTEXT NULL AFTER symptoms' },
+    /* Nothing yet. Add entries here as the schema grows after a release. */
 ];
 
 async function ensureColumn(table, column, definition) {

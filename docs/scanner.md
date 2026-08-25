@@ -70,9 +70,8 @@ Svelte snippet. Each chassis in `web/src/lib/chassis/` draws its own case, bezel
 and buttons around that snippet and sets the `--lcd-*` tokens that tint it. So a
 change to the firmware lands on all three devices at once, while each keeps its
 own physical character. A chassis needs only to call the `press()` actions —
-`up`, `down`, `left`, `right`, `enter`, `back`, `erase`, plus optional
-`readiness` and `info` — and wire `holdStart` / `holdEnd` to its ENTER key for
-the press-and-hold erase.
+`up`, `down`, `left`, `right`, `enter`, `back`, plus the optional shortcuts
+`readiness`, `info` and `live`.
 
 ## What it can and cannot see
 
@@ -113,9 +112,8 @@ counts. From there:
 | --- | --- |
 | ▲ ▼ | move the cursor |
 | ◀ ▶ | jump a page |
-| ENTER | select, and hold to confirm an erase |
+| ENTER | select |
 | BACK | up one level; from the main menu it unplugs |
-| ERASE | jumps straight to the erase prompt |
 | INFO | vehicle information |
 | UNPLUG | done |
 
@@ -133,7 +131,6 @@ and pressing a key visibly depresses the matching button.
 | FREEZE FRAME | the conditions captured when the code set |
 | VEHICLE INFO | VIN, plate, protocol, calibration ID, odometer, warning lamp |
 | I/M MONITORS | readiness monitors, and whether they have run |
-| ERASE CODES | clears stored codes. Repairs nothing |
 
 ### Browsing the systems
 
@@ -190,23 +187,25 @@ Code namespaces follow the machine, because they do in life:
 | Helicopters and aircraft | BITE | `RTR-118`, `ENG-041`, `HYD-002` |
 | Boats | SAE J1939 | `SPN 100 FMI 1` |
 
-## Erasing codes
+## Codes clear themselves
 
-Holding ENTER on the erase page clears the stored codes and resets the readiness
-monitors. It repairs precisely nothing.
+There is no clear-codes button, and that is deliberate. Codes are not stored
+anywhere — they are derived from the vehicle's condition every time the tool
+reads it. So a code exists exactly as long as the fault does:
 
-What actually happens:
+```
+before  P0171  Fuel trim system too lean, bank 1     air filter at 34%
+        P0101  Mass air flow sensor circuit range
 
-1. Stored codes drop back to **pending** and the MIL goes out.
-2. The readiness monitors read **incomplete** — a giveaway to the next person
-   who scans it.
-3. After `Config.scanner.reconfirmMetres` of driving (2 km by default) the faults
-   re-confirm and the light comes back on.
+  → mechanic fits a new air filter
 
-This is deliberately the trick somebody pulls before selling a car, and it is
-logged to `ag_mechanic_log` with the actor and the number of codes cleared. Set
-`Config.scanner.allowErase = false` to remove it, or
-`eraseRequiresJob = true` to restrict it to mechanics.
+after   (both gone — nothing was erased, the fault simply is not there)
+        engine codes untouched, because the engine was not touched
+```
+
+Fix a part and its codes stop appearing on the next read. Fix everything and the
+warning lamp goes out on its own. Nothing to press, nothing to remember, and no
+way to make the light go out without actually doing the work.
 
 ## Configuration
 
@@ -216,9 +215,6 @@ Which tool reads what is in the device table in `config/dtc.js`, not here.
 scanner: {
     hookupDuration: 4500,      // finding the port
     linkTtl: 10 * 60 * 1000,   // how long the findings stay usable
-    allowErase: true,
-    eraseRequiresJob: false,
-    reconfirmMetres: 2000,     // driving needed before a cleared fault returns
     liveInterval: 900,         // live data refresh, ms
 }
 ```
