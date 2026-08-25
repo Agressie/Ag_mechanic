@@ -1,8 +1,39 @@
-# The scanner
+# The scanners
 
-A handheld OBD tool, and the other half of diagnostics. It is a real device on
-screen: a character LCD and six buttons, and you work the firmware the way you
-would work the real thing.
+The other half of diagnostics. Each is a real device on screen: a character LCD
+and six buttons, and you work the firmware the way you would work the real thing.
+
+## Three tools, not one
+
+A car scan tool speaks OBD-II over CAN. It cannot talk to an aircraft, which
+reports built-in-test faults over ARINC 429, or to a marine diesel on J1939. So
+they are separate items, and bringing the wrong one gets you a refusal naming the
+one you should have brought.
+
+| Item | Device | Reads | Bus |
+| --- | --- | --- | --- |
+| `obd_scanner` | AGM-9000 | cars, bikes | OBD-II / CAN |
+| `bite_tester` | AV-4 | helicopters, aircraft | ARINC 429 |
+| `marine_diagnostic` | MD-2 | boats | SAE J1939 |
+
+They do not just differ by which vehicles they accept — each carries its own
+vocabulary, because the trades do not use the same words:
+
+| AGM-9000 | AV-4 | MD-2 |
+| --- | --- | --- |
+| STORED CODES | ACTIVE FAULTS | ACTIVE DTCs |
+| PENDING CODES | INTERMITTENT | INACTIVE DTCs |
+| SYSTEM SCAN | LRU SCAN | ECU SCAN |
+| MODULE | LRU | ECU |
+| CODE | FAULT | DTC |
+| MIL | CAUTION | WARN |
+| FREEZE FRAME | SNAPSHOT | SNAPSHOT |
+| I/M MONITORS | BITE STATUS | SELF TEST |
+
+The device table lives at the bottom of `config/dtc.js`. Its `blueprints` field
+decides what each tool accepts, so merging aircraft and marine into one box — or
+splitting helicopters off from fixed-wing — is a one-line edit. Nothing else
+needs changing: the firmware reads its labels off `lexicon`.
 
 ## What it can and cannot see
 
@@ -27,10 +58,14 @@ vehicle you have scanned *and* inspected gives you a complete report.
 
 ## Using it
 
-You need `obd_scanner` in your inventory. Then either:
+You need the matching tool in your inventory — anyone can, it is not restricted
+to the mechanic job. Then either:
 
 - target the vehicle → **Plug in a diagnostic scanner**, or
 - use the item, if your inventory is wired for it (see `docs/items.md`).
+
+The ox_target option appears if you are carrying *any* of the three tools; the
+server decides whether it is the right one for what you are standing next to.
 
 The device boots, links up and reports the protocol, VIN, MIL state and code
 counts. From there:
@@ -54,14 +89,32 @@ and pressing a key visibly depresses the matching button.
 | --- | --- |
 | READ CODES | confirmed faults, worst first. Open one for the detail |
 | PENDING CODES | seen but not confirmed over enough drive cycles |
-| MODULE SCAN | how many faults each module holds — this is the "where" |
+| SYSTEM SCAN | the vehicle as a tree of systems — see below |
 | LIVE DATA | sensor values, refreshed while the page is open |
 | FREEZE FRAME | the conditions captured when the code set |
-| VEHICLE INFO | VIN, plate, protocol, calibration ID, odometer, MIL |
+| VEHICLE INFO | VIN, plate, protocol, calibration ID, odometer, warning lamp |
 | I/M MONITORS | readiness monitors, and whether they have run |
 | ERASE CODES | clears stored codes. Repairs nothing |
 
-Opening a code is the payoff. It names the fault, the module that reported it,
+### Browsing the systems
+
+SYSTEM SCAN is a tree you walk with the D-pad rather than a flat list. Systems
+with nothing wrong are still listed and still open, because "the ABS module
+reports no faults" is a real answer:
+
+```
+LRU SCAN                          SYSTEM  >  PART  >  FAULT
+> ENGINE   Engine Control Module   2S 1P
+  ROTOR    Rotor & Drive Monitor   2S 0P
+  HYDR     Hydraulic System Mon…      OK
+  FLIGHT   Flight Control Unit        OK
+```
+
+Open a system and you get the parts it watches, each marked OK, PEND or FAULT.
+Open a part and you get where it physically is, plus every fault standing against
+it. Open one of those and you get the full detail. Four levels, all on the arrows.
+
+Opening a code is the payoff. It names the fault, the system that reported it,
 the actual part, the sub-location — *which* cylinder, *which* corner — and a
 plain-language description of where to go and look:
 
@@ -77,6 +130,10 @@ SEVERITY HIGH
 WHERE    Coil pack on cylinder 1, under the
          ignition cover
 ```
+
+A scanner deliberately never shows a wear percentage. It reports faults, not
+condition — a figure for how worn something is comes from a hands-on inspection,
+which is what the report is for.
 
 ## Codes are deterministic
 
@@ -114,9 +171,10 @@ logged to `ag_mechanic_log` with the actor and the number of codes cleared. Set
 
 ## Configuration
 
+Which tool reads what is in the device table in `config/dtc.js`, not here.
+
 ```js
 scanner: {
-    item: 'obd_scanner',       // required in inventory; no item, no scan
     hookupDuration: 4500,      // finding the port
     linkTtl: 10 * 60 * 1000,   // how long the findings stay usable
     allowErase: true,

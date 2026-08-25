@@ -114,6 +114,7 @@ if (AGM.Config.tablet.keybind) {
  */
 exports('useTablet', () => AGM.tablet.open('home'));
 
+/* One export for all three tools - the vehicle decides which is valid. */
 exports('useScanner', () => {
     const vehicle = AGM.state.nearestVehicle(6.0);
     if (!vehicle) return AGM.ui.notify(AGM.Config.locale.noVehicle, 'error');

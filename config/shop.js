@@ -34,7 +34,9 @@ AGM.Shop = {
         /* ---- consumables ------------------------------------------------ */
         P('ducttape', 'Duct Tape', 'consumables', 25, { packs: [5, 10, 25], blurb: 'Holds a bumper on. Holds a radiator hose. Briefly.' }),
         P('zipties', 'Cable Ties', 'consumables', 18, { packs: [10, 25, 50], blurb: 'The correct tool for absolutely nothing, used for everything.' }),
-        P('obd_scanner', 'OBD Diagnostic Scanner', 'consumables', 1200, { packs: [1, 2], blurb: 'Turns guesswork into numbers.' }),
+        P('obd_scanner', 'OBD-II Scan Tool', 'consumables', 1200, { packs: [1, 2], blurb: 'Turns guesswork into codes. Cars and bikes only.' }),
+        P('bite_tester', 'Avionics BITE Test Set', 'aircraft', 8600, { packs: [1], blurb: 'Reads built-in-test faults off an airframe. Will not talk to a car.' }),
+        P('marine_diagnostic', 'Marine Diagnostic Tool', 'marine', 2400, { packs: [1], blurb: 'J1939 reader for marine diesels.' }),
         P('mechanic_toolbox', 'Mechanic Toolbox', 'consumables', 900, { packs: [1, 2], blurb: 'Spanners, sockets, and a torque wrench nobody calibrates.' }),
         P('mechanic_tablet', 'Shop Tablet', 'consumables', 2500, { packs: [1, 2], blurb: 'Roster, stash and the parts account, in one greasy screen.' }),
 

@@ -56,7 +56,8 @@ AGM.targets.registerVehicles = function () {
             label: 'Plug in a diagnostic scanner',
             icon: 'fa-solid fa-plug-circle-bolt',
             distance: 2.5,
-            items: AGM.Config.scanner.item ? [AGM.Config.scanner.item] : undefined,
+            items: AGM.Dtc.deviceItems(),
+            anyItem: true,
             event: 'ag_mechanic:client:targetScan',
         },
         {

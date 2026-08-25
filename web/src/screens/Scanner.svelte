@@ -17,6 +17,16 @@
     let scan = $state(payload.scan || { codes: [], modules: [], live: [], monitors: [], counts: {} });
     const canErase = $derived(payload.canErase !== false);
 
+    /* The three tools do not use the same words for the same things, so every
+       label on the device comes from its own lexicon. */
+    const FALLBACK_LEXICON = {
+        codes: 'STORED CODES', pending: 'PENDING CODES', systems: 'SYSTEM SCAN',
+        system: 'MODULE', code: 'CODE', erase: 'ERASE CODES', lamp: 'MIL',
+        live: 'LIVE DATA', frame: 'FREEZE FRAME', monitors: 'I/M MONITORS',
+    };
+    const device = $derived(scan.device || { model: 'AGM-9000', bus: 'OBD-II / CAN', lexicon: FALLBACK_LEXICON });
+    const lex = $derived({ ...FALLBACK_LEXICON, ...(device.lexicon || {}) });
+
     /* --- firmware state ------------------------------------------------ */
     let view = $state('boot');
     let stack = $state([]);
@@ -25,6 +35,8 @@
     let status = $state('');
     let bootLines = $state([]);
     let moduleFilter = $state(null);
+    let openSystem = $state(null);
+    let openPart = $state(null);
     let openCode = $state(null);
     let frame = $state(null);
     let eraseHeld = $state(0);
@@ -33,16 +45,16 @@
 
     const ROWS = 7;
 
-    const MENU = [
-        { id: 'codes', label: 'READ CODES' },
-        { id: 'pending', label: 'PENDING CODES' },
-        { id: 'modules', label: 'MODULE SCAN' },
-        { id: 'live', label: 'LIVE DATA' },
-        { id: 'freeze', label: 'FREEZE FRAME' },
+    const MENU = $derived([
+        { id: 'codes', label: `READ ${lex.codes}` },
+        { id: 'pending', label: lex.pending },
+        { id: 'systems', label: lex.systems },
+        { id: 'live', label: lex.live },
+        { id: 'freeze', label: lex.frame },
         { id: 'info', label: 'VEHICLE INFO' },
-        { id: 'monitors', label: 'I/M MONITORS' },
-        { id: 'erase', label: 'ERASE CODES' },
-    ];
+        { id: 'monitors', label: lex.monitors },
+        { id: 'erase', label: lex.erase },
+    ]);
 
     const stored = $derived(scan.codes.filter((c) => c.status === 'stored'));
     const pending = $derived(scan.codes.filter((c) => c.status === 'pending'));
@@ -53,7 +65,9 @@
             case 'menu': return MENU;
             case 'codes': return stored;
             case 'pending': return pending;
-            case 'modules': return scan.modules;
+            case 'systems': return scan.modules;
+            case 'systemParts': return openSystem ? openSystem.parts : [];
+            case 'part': return openPart ? openPart.codes : [];
             case 'moduleCodes': return scan.codes.filter((c) => c.module === moduleFilter);
             case 'live': return scan.live;
             case 'monitors': return scan.monitors;
@@ -65,7 +79,7 @@
     const menuCounts = $derived({
         codes: stored.length,
         pending: pending.length,
-        modules: scan.modules.filter((m) => m.stored || m.pending).length,
+        systems: scan.modules.length,
     });
 
     /* --- boot ----------------------------------------------------------- */
@@ -73,7 +87,7 @@
         const timers = [];
         const say = (text, delay) => timers.push(setTimeout(() => { bootLines = [...bootLines, text]; }, delay));
 
-        say('AGM-9000 OBD-II SCAN TOOL', 120);
+        say(`${device.model}  ${(scan.device && scan.device.label ? scan.device.label : 'SCAN TOOL').toUpperCase()}`, 120);
         say('FIRMWARE v2.14  SELF TEST OK', 480);
         say('', 700);
         say('ESTABLISHING LINK...', 820);
@@ -99,7 +113,9 @@
 
     /* --- navigation ----------------------------------------------------- */
     function go(next, remember = true) {
-        if (remember && view !== next) stack = [...stack, { view, cursor, top, moduleFilter, openCode }];
+        if (remember && view !== next) {
+            stack = [...stack, { view, cursor, top, moduleFilter, openSystem, openPart, openCode }];
+        }
         view = next;
         cursor = 0;
         top = 0;
@@ -117,6 +133,8 @@
         cursor = previous.cursor;
         top = previous.top;
         moduleFilter = previous.moduleFilter;
+        openSystem = previous.openSystem;
+        openPart = previous.openPart;
         openCode = previous.openCode;
         status = '';
     }
@@ -149,19 +167,30 @@
             return go(choice.id);
         }
 
-        if (view === 'codes' || view === 'pending' || view === 'moduleCodes') {
+        if (view === 'codes' || view === 'pending' || view === 'moduleCodes' || view === 'part') {
             const code = list[cursor];
             if (!code) return;
-            openCode = code;
+            /* Codes reached through a part already know which part they are on. */
+            openCode = view === 'part'
+                ? { ...code, component: openPart.id, componentLabel: openPart.label, where: openPart.where, location: openPart.location, moduleLabel: openSystem ? openSystem.label : '' }
+                : code;
             return go('code');
         }
 
-        if (view === 'modules') {
+        /* Systems are browsable whether or not they have faults - a module
+           reporting nothing wrong is still worth being able to look at. */
+        if (view === 'systems') {
             const module = list[cursor];
             if (!module) return;
-            if (!module.stored && !module.pending) return beep(`${module.short}: NO FAULTS`);
-            moduleFilter = module.id;
-            return go('moduleCodes');
+            openSystem = module;
+            return go('systemParts');
+        }
+
+        if (view === 'systemParts') {
+            const part = list[cursor];
+            if (!part) return;
+            openPart = part;
+            return go('part');
         }
 
         if (view === 'code' && openCode) return openFreeze(openCode.component);
@@ -269,6 +298,10 @@
 
     const window7 = $derived(list.slice(top, top + ROWS));
 
+    /* The keypad is silkscreened in the device's own language: ERASE on a car
+       tool, CLEAR on a BITE set, RESET on a marine reader. */
+    const eraseKey = $derived(lex.erase.split(' ')[0]);
+
     /* "3/6" on the detail page, so you know where you are in the list. */
     const codeIndex = $derived.by(() => {
         if (!openCode) return '';
@@ -281,13 +314,23 @@
     });
     const scrollHint = $derived(list.length > ROWS ? `${cursor + 1}/${list.length}` : '');
 
-    const TITLES = {
-        menu: 'MAIN MENU', codes: 'STORED CODES', pending: 'PENDING CODES',
-        modules: 'MODULE SCAN', moduleCodes: moduleFilter || 'MODULE',
-        code: 'CODE DETAIL', live: 'LIVE DATA', freeze: 'FREEZE FRAME',
-        info: 'VEHICLE INFO', monitors: 'I/M MONITORS', erase: 'ERASE CODES',
-        erasing: 'ERASING', erased: 'ERASE COMPLETE',
-    };
+    const TITLES = $derived({
+        menu: 'MAIN MENU',
+        codes: lex.codes,
+        pending: lex.pending,
+        systems: lex.systems,
+        systemParts: openSystem ? openSystem.short : lex.system,
+        part: openPart ? 'PART' : lex.system,
+        moduleCodes: moduleFilter || lex.system,
+        code: `${lex.code} DETAIL`,
+        live: lex.live,
+        freeze: lex.frame,
+        info: 'VEHICLE INFO',
+        monitors: lex.monitors,
+        erase: lex.erase,
+        erasing: 'CLEARING',
+        erased: 'DONE',
+    });
 
     /* Word-wraps the "where" text onto the LCD without breaking words. */
     function wrap(text, width) {
@@ -313,9 +356,9 @@
 
         <div class="shell">
             <div class="brandbar">
-                <span class="brand">AGM<span class="brand-num">9000</span></span>
-                <span class="brand-sub">OBD-II / BITE / J1939</span>
-                <span class="mil" class:on={scan.mil}>MIL</span>
+                <span class="brand">{device.model}</span>
+                <span class="brand-sub">{device.bus}</span>
+                <span class="mil" class:on={scan.mil}>{lex.lamp}</span>
             </div>
 
             <!-- ---------------------------------------------------- screen -->
@@ -332,9 +375,42 @@
                         <div class="kv"><span>PROTOCOL</span><b>{clip(scan.protocol, 22)}</b></div>
                         <div class="kv"><span>VIN</span><b>{scan.vin}</b></div>
                         <div class="kv"><span>PLATE</span><b>{scan.plate}</b></div>
-                        <div class="kv"><span>MIL</span><b class:alarm={scan.mil}>{scan.mil ? 'ON' : 'OFF'}</b></div>
-                        <div class="kv"><span>CODES</span><b>{scan.counts.stored} STORED / {scan.counts.pending} PENDING</b></div>
+                        <div class="kv"><span>{lex.lamp}</span><b class:alarm={scan.mil}>{scan.mil ? 'ON' : 'OFF'}</b></div>
+                        <div class="kv"><span>FAULTS</span><b>{scan.counts.stored} ACTIVE / {scan.counts.pending} PENDING</b></div>
                         <div class="hint blink">PRESS ENTER</div>
+
+                    {:else if view === 'part' && openPart}
+                        <div class="statusbar">
+                            <span>{clip(openPart.label, 24)}</span>
+                            <span class="spacer"></span>
+                            <span class:alarm={openPart.status === 'fault'}>
+                                {openPart.status === 'fault' ? 'FAULT' : openPart.status === 'pending' ? 'PENDING' : 'NO FAULT'}
+                            </span>
+                        </div>
+                        {#if openSystem}
+                            <div class="kv"><span>{lex.system}</span><b>{clip(openSystem.label, 27)}</b></div>
+                        {/if}
+                        {#if openPart.location}
+                            <div class="kv"><span>AT</span><b>{clip(openPart.location, 27)}</b></div>
+                        {/if}
+                        <div class="kv where"><span>WHERE</span><b>
+                            {#each wrap(openPart.where, 27) as line}<div>{line}</div>{/each}
+                        </b></div>
+                        <div class="rule"></div>
+
+                        {#if !openPart.codes.length}
+                            <div class="centre dim">NO {lex.code}S STORED</div>
+                        {:else}
+                            {#each openPart.codes as code, index}
+                                <div class="row" class:active={index === cursor}>
+                                    <span class="marker">{index === cursor ? '>' : ' '}</span>
+                                    <span class="code">{clip(code.code, 14)}</span>
+                                    <span class="text">{clip(code.desc, 22)}</span>
+                                    <span class="tail sev {code.severity}">{code.status === 'stored' ? 'S' : 'P'}</span>
+                                </div>
+                            {/each}
+                            <div class="hint">[ENTER] OPEN {lex.code} &nbsp; [BACK]</div>
+                        {/if}
 
                     {:else if view === 'code' && openCode}
                         <div class="statusbar">
@@ -345,7 +421,7 @@
                         </div>
                         <div class="desc">{openCode.desc}</div>
                         <div class="rule"></div>
-                        <div class="kv"><span>SYSTEM</span><b>{clip(openCode.moduleLabel, 27)}</b></div>
+                        <div class="kv"><span>{lex.system}</span><b>{clip(openCode.moduleLabel, 27)}</b></div>
                         <div class="kv"><span>PART</span><b>{clip(openCode.componentLabel, 27)}</b></div>
                         {#if openCode.location}
                             <div class="kv"><span>AT</span><b>{clip(openCode.location, 27)}</b></div>
@@ -357,7 +433,7 @@
                         <div class="kv where"><span>WHERE</span><b>
                             {#each wrap(openCode.where, 27) as line}<div>{line}</div>{/each}
                         </b></div>
-                        <div class="hint">[ENTER] FREEZE FRAME &nbsp; [BACK]</div>
+                        <div class="hint">[ENTER] {lex.frame} &nbsp; [BACK]</div>
 
                     {:else if view === 'info'}
                         <div class="statusbar"><span>VEHICLE</span><span class="spacer"></span><span>{scan.blueprintLabel}</span></div>
@@ -370,19 +446,19 @@
 
                     {:else if view === 'erase'}
                         <div class="statusbar"><span>ERASE</span><span class="spacer"></span><span class="alarm">CAUTION</span></div>
-                        <div class="desc">Clears {stored.length} stored code{stored.length === 1 ? '' : 's'} and resets the readiness monitors.</div>
+                        <div class="desc">Clears {stored.length} {lex.code.toLowerCase()}{stored.length === 1 ? '' : 's'} and resets the monitors.</div>
                         <div class="desc dim">It does not repair anything. The fault will set again once the vehicle has been driven.</div>
                         <div class="holdbar"><div class="fill" style="width:{eraseHeld * 100}%"></div></div>
                         <div class="hint blink">HOLD ENTER TO CONFIRM</div>
 
                     {:else if view === 'erasing'}
                         <div class="statusbar"><span>ERASE</span><span class="spacer"></span><span>BUSY</span></div>
-                        <div class="centre blink">CLEARING CODES...</div>
+                        <div class="centre blink">CLEARING {lex.code}S...</div>
 
                     {:else if view === 'erased'}
                         <div class="statusbar"><span>ERASE</span><span class="spacer"></span><span>DONE</span></div>
-                        <div class="centre">{erasedCount} CODE{erasedCount === 1 ? '' : 'S'} CLEARED</div>
-                        <div class="desc dim">Monitors reset. Codes will re-confirm after driving.</div>
+                        <div class="centre">{erasedCount} {lex.code}{erasedCount === 1 ? '' : 'S'} CLEARED</div>
+                        <div class="desc dim">Monitors reset. Faults will re-confirm once it has been used again.</div>
                         <div class="hint">[ENTER] MAIN MENU</div>
 
                     {:else}
@@ -394,7 +470,7 @@
 
                         {#if !list.length}
                             <div class="centre dim">
-                                {view === 'pending' ? 'NO PENDING CODES' : view === 'codes' ? 'NO STORED CODES' : 'NO DATA'}
+                                {view === 'pending' ? `NO ${lex.pending}` : view === 'codes' ? `NO ${lex.codes}` : 'NO DATA'}
                             </div>
                         {/if}
 
@@ -413,12 +489,20 @@
                                     <span class="text">{clip(row.desc, 20)}</span>
                                     <span class="tail sev {row.severity}">{row.severity === 'high' ? '!!' : row.severity === 'medium' ? '!' : ''}</span>
 
-                                {:else if view === 'modules'}
+                                {:else if view === 'systems'}
                                     <span class="code">{row.short}</span>
                                     <span class="text">{clip(row.label, 25)}</span>
                                     <span class="tail" class:alarm={row.stored > 0}>
                                         {row.stored || row.pending ? `${row.stored}S ${row.pending}P` : 'OK'}
                                     </span>
+
+                                {:else if view === 'systemParts'}
+                                    <span class="text">{clip(row.label, 30)}</span>
+                                    <span
+                                        class="tail"
+                                        class:alarm={row.status === 'fault'}
+                                        class:warn={row.status === 'pending'}
+                                    >{row.status === 'fault' ? 'FAULT' : row.status === 'pending' ? 'PEND' : 'OK'}</span>
 
                                 {:else if view === 'live'}
                                     <span class="text">{clip(row.label, 24)}</span>
@@ -446,7 +530,7 @@
             <div class="keypad">
                 <div class="side">
                     <button class="key wide" class:held={pressed === 'back'} onclick={() => press('back')}>BACK</button>
-                    <button class="key wide danger" class:held={pressed === 'erase'} onclick={() => press('erase')}>ERASE</button>
+                    <button class="key wide danger" class:held={pressed === 'erase'} onclick={() => press('erase')}>{eraseKey}</button>
                 </div>
 
                 <div class="dpad">
@@ -569,6 +653,7 @@
     .text { flex: 1; overflow: hidden; }
     .tail { color: #cfefff; }
     .tail.alarm, .alarm { color: #ff8f6b; }
+    .tail.warn { color: #ffd23f; }
     .sev.high { color: #ff8f6b; }
     .sev.medium { color: #ffd23f; }
 

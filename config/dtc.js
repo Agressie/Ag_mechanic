@@ -39,16 +39,21 @@ const D = (code, desc, o = {}) => Object.assign({ code, desc, at: 70, severity: 
 const C = (o) => Object.assign({ ecu: true, module: 'ECM', location: 'fixed', where: '', codes: [] }, o);
 
 /* ------------------------------------------------------------------ modules */
+/*
+ * Declared in the order a scanner lists them: the system that moves the machine
+ * first, body electrics last. The list is filtered per vehicle, so a boat shows
+ * MARINE then BODY, and a helicopter ENGINE, ROTOR, HYDR, FLIGHT, BODY.
+ */
 const MODULES = [
     { id: 'ECM', label: 'Engine Control Module', short: 'ENGINE' },
+    { id: 'MCU', label: 'Marine Control Unit', short: 'MARINE' },
     { id: 'TCM', label: 'Transmission Control Module', short: 'TRANS' },
+    { id: 'RCU', label: 'Rotor & Drive Monitor', short: 'ROTOR' },
+    { id: 'HYD', label: 'Hydraulic System Monitor', short: 'HYDR' },
+    { id: 'FCU', label: 'Flight Control Unit', short: 'FLIGHT' },
     { id: 'ABS', label: 'ABS / Stability Control', short: 'ABS' },
     { id: 'EPS', label: 'Power Steering Module', short: 'STEER' },
     { id: 'BCM', label: 'Body Control Module', short: 'BODY' },
-    { id: 'FCU', label: 'Flight Control Unit', short: 'FLIGHT' },
-    { id: 'RCU', label: 'Rotor & Drive Monitor', short: 'ROTOR' },
-    { id: 'HYD', label: 'Hydraulic System Monitor', short: 'HYDR' },
-    { id: 'MCU', label: 'Marine Control Unit', short: 'MARINE' },
 ];
 
 /* ------------------------------------------------------- road vehicles (OBD-II) */
@@ -431,19 +436,104 @@ const BOAT_DTC = {
     ] }),
 };
 
+/*
+ * Diagnostic devices
+ * ----------------------------------------------------------------------------
+ * A car scan tool speaks OBD-II over CAN. It cannot talk to an aircraft, which
+ * reports built-in-test faults over ARINC, or to a marine diesel on J1939. So
+ * they are separate tools, and bringing the wrong one to a job gets you nothing.
+ *
+ * Each device carries its own vocabulary, because the trades do not use the same
+ * words: a car has stored codes on modules, an aircraft has active faults on
+ * LRUs, a boat has active DTCs on ECUs. The firmware reads off `lexicon`, so the
+ * three devices genuinely feel like different instruments.
+ *
+ * To merge or split devices, edit `blueprints` here - nothing else needs to
+ * change.
+ */
+const DEVICES = [
+    {
+        id: 'obd',
+        item: 'obd_scanner',
+        label: 'OBD-II Scan Tool',
+        model: 'AGM-9000',
+        bus: 'OBD-II / CAN',
+        protocol: 'ISO 15765-4 CAN 11/500',
+        blueprints: ['car', 'bike'],
+        port: 'the diagnostic port',
+        lexicon: {
+            codes: 'STORED CODES',
+            pending: 'PENDING CODES',
+            systems: 'SYSTEM SCAN',
+            system: 'MODULE',
+            code: 'CODE',
+            erase: 'ERASE CODES',
+            lamp: 'MIL',
+            live: 'LIVE DATA',
+            frame: 'FREEZE FRAME',
+            monitors: 'I/M MONITORS',
+        },
+    },
+    {
+        id: 'bite',
+        item: 'bite_tester',
+        label: 'Avionics BITE Test Set',
+        model: 'AV-4',
+        bus: 'ARINC 429',
+        protocol: 'ARINC 429 / BITE',
+        blueprints: ['heli', 'plane'],
+        port: 'the maintenance data port',
+        lexicon: {
+            codes: 'ACTIVE FAULTS',
+            pending: 'INTERMITTENT',
+            systems: 'LRU SCAN',
+            system: 'LRU',
+            code: 'FAULT',
+            erase: 'CLEAR FAULT LOG',
+            lamp: 'CAUTION',
+            live: 'PARAMETERS',
+            frame: 'SNAPSHOT',
+            monitors: 'BITE STATUS',
+        },
+    },
+    {
+        id: 'marine',
+        item: 'marine_diagnostic',
+        label: 'Marine Diagnostic Tool',
+        model: 'MD-2',
+        bus: 'SAE J1939',
+        protocol: 'SAE J1939 250k',
+        blueprints: ['boat'],
+        port: 'the engine loom connector',
+        lexicon: {
+            codes: 'ACTIVE DTCs',
+            pending: 'INACTIVE DTCs',
+            systems: 'ECU SCAN',
+            system: 'ECU',
+            code: 'DTC',
+            erase: 'RESET DTCs',
+            lamp: 'WARN',
+            live: 'LIVE DATA',
+            frame: 'SNAPSHOT',
+            monitors: 'SELF TEST',
+        },
+    },
+];
+
 AGM.Dtc = {
     modules: MODULES,
+    devices: DEVICES,
     sets: { car: CAR_DTC, bike: BIKE_DTC, heli: HELI_DTC, plane: PLANE_DTC, boat: BOAT_DTC },
-
-    /* Protocol string the scanner reports on link-up, per machine. */
-    protocols: {
-        car: 'ISO 15765-4 CAN 11/500',
-        bike: 'ISO 15765-4 CAN 11/500',
-        heli: 'ARINC 429 / BITE',
-        plane: 'ARINC 429 / BITE',
-        boat: 'SAE J1939 250k',
-    },
 };
+
+/** The tool that can talk to this machine, or undefined. */
+AGM.Dtc.deviceFor = (blueprint) => DEVICES.find((d) => d.blueprints.includes(blueprint));
+
+/** The tool a given inventory item is, or undefined. */
+AGM.Dtc.deviceByItem = (item) => DEVICES.find((d) => d.item === item);
+
+/** Every diagnostic device item, for inventory filters. */
+AGM.Dtc.deviceItems = () => DEVICES.map((d) => d.item);
 
 /** DTC definition for a component, or undefined. */
 AGM.Dtc.get = (blueprint, componentId) => (AGM.Dtc.sets[blueprint] || {})[componentId];
@@ -475,4 +565,7 @@ AGM.Dtc.moduleLabel = function (id) {
     return found ? found.label : id;
 };
 
-AGM.Dtc.protocol = (blueprint) => AGM.Dtc.protocols[blueprint] || 'ISO 15765-4 CAN';
+AGM.Dtc.protocol = function (blueprint) {
+    const device = AGM.Dtc.deviceFor(blueprint);
+    return device ? device.protocol : 'ISO 15765-4 CAN';
+};

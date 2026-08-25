@@ -77,14 +77,28 @@ nowhere; a dead main rotor means it does not fly.
 
 Two tools, and they see different halves of the vehicle.
 
-**The scanner** is a handheld device with an LCD and six buttons — you work the
-firmware, not a menu. It needs `obd_scanner` in your inventory, and it reads what
-the control modules know: real fault codes with severities, the module that
-reported each one, the exact sub-location (*which* cylinder, *which* corner), and
-plain-language directions to the part. Also live sensor data, freeze frames,
-readiness monitors, and a per-module fault count. Codes are deterministic — the
-same car always reports the same cylinder, so scanning twice tells you the same
-story. Full details in [`docs/scanner.md`](docs/scanner.md).
+**The scanners** are handheld devices with an LCD and six buttons — you work the
+firmware, not a menu. Anyone can carry one; it is not restricted to the job. They
+read what the control modules know: real fault codes with severities, the system
+that reported each one, the exact sub-location (*which* cylinder, *which*
+corner), and plain-language directions to the part. Also live sensor data, freeze
+frames, readiness monitors, and a system tree you walk with the arrows —
+system → part → fault → detail, with healthy systems still browsable.
+
+There are three, and they are not interchangeable, because a car scan tool cannot
+talk to an aircraft:
+
+| Item | Device | Reads | Bus |
+| --- | --- | --- | --- |
+| `obd_scanner` | AGM-9000 | cars, bikes | OBD-II / CAN |
+| `bite_tester` | AV-4 | helicopters, aircraft | ARINC 429 |
+| `marine_diagnostic` | MD-2 | boats | SAE J1939 |
+
+Each speaks its own trade language too — stored codes on modules, active faults
+on LRUs, active DTCs on ECUs — so the three genuinely feel like different
+instruments. Bring the wrong box and it tells you which one you wanted. Codes are
+deterministic: the same car always reports the same cylinder, so scanning twice
+tells you the same story. Full details in [`docs/scanner.md`](docs/scanner.md).
 
 ```
 P0301                              2/6  STORED
@@ -231,7 +245,7 @@ Senior Mechanic, Shop Manager, Owner.
 | `config/config.js` | job, grades and permissions, tablet, repair rules, diagnostics, economy, persistence, anti-abuse, all player-facing text |
 | `config/components.js` | the component health blueprints — the heart of it |
 | `config/tiers.js` | the named upgrade ladders |
-| `config/dtc.js` | fault codes, which module reports them, and where each part physically is |
+| `config/dtc.js` | fault codes, which system reports them, where each part physically is, and the three diagnostic devices |
 | `config/damage.js` | what each kind of abuse damages, and detection thresholds |
 | `config/handling.js` | how a performance axis maps onto handling fields |
 | `config/shop.js` | catalogue, prices, order and delivery timings |
@@ -267,10 +281,11 @@ npm run dev      # http://localhost:5173/?screen=tablet
 npm run build    # writes ../html
 ```
 
-`?screen=` takes `tablet`, `report`, `upgrades`, `diagnose` or `scanner`, and the
-dev fixtures in `web/src/lib/dev.js` mean every screen renders with plausible
-content in a plain browser — including canned RPC responses, so the tablet's apps
-and the scanner's live data both work without the game.
+`?screen=` takes `tablet`, `report`, `upgrades`, `diagnose` or `scanner`, and
+`?screen=scanner&device=obd|bite|marine` picks which of the three tools to render.
+The dev fixtures in `web/src/lib/dev.js` mean every screen works in a plain
+browser — including canned RPC responses, so the tablet's apps and the scanner's
+live data both tick without the game.
 
 ## Exports and commands
 

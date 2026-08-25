@@ -90,8 +90,11 @@ AGM.Config = {
 
     /* ----------------------------------------------------------- scanner */
     scanner: {
-        /* Required in the player's inventory. No item, no scan. */
-        item: 'obd_scanner',
+        /*
+         * Which tool works on what is decided by the device table in
+         * config/dtc.js - a car scan tool cannot talk to an aircraft. The
+         * matching device must be in the player's inventory: no tool, no scan.
+         */
         /* Plugging into the port, before the device wakes up. */
         hookupDuration: 4500,
         /* A scan's findings stay usable for this long (ms). */

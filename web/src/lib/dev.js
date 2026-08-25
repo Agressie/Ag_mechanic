@@ -191,9 +191,27 @@ export function devRpc(name) {
 
         case 'scanner:erase': {
             const scan = devScanner().scan;
-            return { ok: true, cleared: 6, scan: { ...scan, mil: false, counts: { stored: 0, pending: 7 },
-                codes: scan.codes.map((c) => ({ ...c, status: 'pending' })),
-                modules: scan.modules.map((m) => ({ ...m, pending: m.stored + m.pending, stored: 0 })) } };
+            return {
+                ok: true,
+                cleared: scan.counts.stored,
+                scan: {
+                    ...scan,
+                    mil: false,
+                    counts: { stored: 0, pending: scan.codes.length },
+                    codes: scan.codes.map((c) => ({ ...c, status: 'pending' })),
+                    modules: scan.modules.map((m) => ({
+                        ...m,
+                        stored: 0,
+                        pending: m.stored + m.pending,
+                        parts: m.parts.map((part) => ({
+                            ...part,
+                            status: part.codes.length ? 'pending' : 'ok',
+                            codes: part.codes.map((c) => ({ ...c, status: 'pending' })),
+                        })),
+                    })),
+                    monitors: scan.monitors.map((m) => ({ ...m, state: 'incomplete' })),
+                },
+            };
         }
 
         case 'shop:orders':
@@ -212,46 +230,136 @@ export function devRpc(name) {
     }
 }
 
-export const devScanner = () => ({
-    canErase: true,
-    liveInterval: 900,
-    scan: {
-        plate: 'AG 44 XZ',
-        vin: 'J1JGMAAU6HR7SLLKK',
-        blueprint: 'car',
-        blueprintLabel: 'Automobile',
-        protocol: 'ISO 15765-4 CAN 11/500',
-        odometer: 48213,
-        mil: true,
-        calibration: 'AGM-482913',
-        counts: { stored: 6, pending: 1 },
-        codes: [
-            { code: 'P0301', desc: 'Cylinder 1 misfire detected', severity: 'high', status: 'stored', component: 'spark_plugs', componentLabel: 'Spark Plugs & Coil Packs', module: 'ECM', moduleLabel: 'Engine Control Module', location: 'Cylinder 1, bank 1', where: 'Coil pack on cylinder 1, under the ignition cover' },
-            { code: 'P0524', desc: 'Engine oil pressure too low', severity: 'high', status: 'stored', component: 'oil_system', componentLabel: 'Oil Pump, Filter & Sump', module: 'ECM', moduleLabel: 'Engine Control Module', location: '', where: 'Sump and filter housing, underside of the engine' },
-            { code: 'P1870', desc: 'Transmission component slipping', severity: 'high', status: 'stored', component: 'clutch', componentLabel: 'Clutch & Flywheel', module: 'TCM', moduleLabel: 'Transmission Control Module', location: '', where: 'Bellhousing, between engine and gearbox' },
-            { code: 'C0045', desc: 'Left rear wheel speed sensor circuit', severity: 'medium', status: 'stored', component: 'tire_rl', componentLabel: 'Rear Left Tyre', module: 'ABS', moduleLabel: 'ABS / Stability Control', location: 'Left rear', where: 'Left rear wheel and hub sensor' },
-            { code: 'P0171', desc: 'Fuel trim system too lean, bank 1', severity: 'medium', status: 'stored', component: 'air_filter', componentLabel: 'Air Filter', module: 'ECM', moduleLabel: 'Engine Control Module', location: 'Bank 1', where: 'Airbox, top of engine bay' },
-            { code: 'P0420', desc: 'Catalyst system efficiency below threshold, bank 1', severity: 'low', status: 'stored', component: 'exhaust', componentLabel: 'Exhaust & Manifold', module: 'ECM', moduleLabel: 'Engine Control Module', location: 'Bank 1', where: 'Manifold and downpipe, underside on bank 1' },
-            { code: 'P0128', desc: 'Coolant thermostat below regulating temperature', severity: 'low', status: 'pending', component: 'radiator', componentLabel: 'Radiator, Fan & Coolant', module: 'ECM', moduleLabel: 'Engine Control Module', location: '', where: 'Front of the engine bay, behind the grille' },
-        ],
-        modules: [
-            { id: 'ECM', label: 'Engine Control Module', short: 'ENGINE', stored: 4, pending: 1 },
-            { id: 'TCM', label: 'Transmission Control Module', short: 'TRANS', stored: 1, pending: 0 },
-            { id: 'ABS', label: 'ABS / Stability Control', short: 'ABS', stored: 1, pending: 0 },
-            { id: 'EPS', label: 'Power Steering Module', short: 'STEER', stored: 0, pending: 0 },
-            { id: 'BCM', label: 'Body Control Module', short: 'BODY', stored: 0, pending: 0 },
+/*
+ * Scanner fixtures for all three tools. Pick one in the browser with
+ * ?screen=scanner&device=obd | bite | marine
+ */
+const DEVICE_FIXTURES = {
+    obd: {
+        device: { id: 'obd', label: 'OBD-II Scan Tool', model: 'AGM-9000', bus: 'OBD-II / CAN',
+            lexicon: { codes: 'STORED CODES', pending: 'PENDING CODES', systems: 'SYSTEM SCAN', system: 'MODULE', code: 'CODE', erase: 'ERASE CODES', lamp: 'MIL', live: 'LIVE DATA', frame: 'FREEZE FRAME', monitors: 'I/M MONITORS' } },
+        plate: 'AG 44 XZ', vin: 'J1JGMAAU6HR7SLLKK', blueprintLabel: 'Automobile',
+        protocol: 'ISO 15765-4 CAN 11/500', calibration: 'AGM-482913', odometer: 48213,
+        parts: [
+            ['ECM', 'Engine Control Module', 'ENGINE', 'spark_plugs', 'Spark Plugs & Coil Packs', 'Cylinder 1, bank 1', 'Coil pack on cylinder 1, under the ignition cover',
+                [['P0301', 'Cylinder 1 misfire detected', 'high', 'stored'], ['P0351', 'Ignition coil 1 primary / secondary circuit', 'medium', 'stored']]],
+            ['ECM', 'Engine Control Module', 'ENGINE', 'oil_system', 'Oil Pump, Filter & Sump', '', 'Sump and filter housing, underside of the engine',
+                [['P0524', 'Engine oil pressure too low', 'high', 'stored']]],
+            ['ECM', 'Engine Control Module', 'ENGINE', 'air_filter', 'Air Filter', 'Bank 1', 'Airbox, top of engine bay',
+                [['P0171', 'Fuel trim system too lean, bank 1', 'medium', 'stored']]],
+            ['ECM', 'Engine Control Module', 'ENGINE', 'radiator', 'Radiator, Fan & Coolant', '', 'Front of the engine bay, behind the grille',
+                [['P0128', 'Coolant thermostat below regulating temperature', 'low', 'pending']]],
+            ['ECM', 'Engine Control Module', 'ENGINE', 'battery', 'Battery & Alternator', '', 'Battery tray and alternator belt run', []],
+            ['TCM', 'Transmission Control Module', 'TRANS', 'clutch', 'Clutch & Flywheel', '', 'Bellhousing, between engine and gearbox',
+                [['P1870', 'Transmission component slipping', 'high', 'stored']]],
+            ['TCM', 'Transmission Control Module', 'TRANS', 'gearbox', 'Gearbox', '', 'Transmission tunnel, behind the engine', []],
+            ['ABS', 'ABS / Stability Control', 'ABS', 'tire_rl', 'Rear Left Tyre', 'Left rear', 'Left rear wheel and hub sensor',
+                [['C0045', 'Left rear wheel speed sensor circuit', 'medium', 'stored']]],
+            ['ABS', 'ABS / Stability Control', 'ABS', 'brake_lines', 'Brake Lines & Master Cylinder', '', 'Master cylinder on the bulkhead', []],
+            ['EPS', 'Power Steering Module', 'STEER', 'steering', 'Steering Rack & Column', '', 'Steering rack behind the front subframe', []],
+            ['BCM', 'Body Control Module', 'BODY', 'lights', 'Lighting & Indicators', '', 'Lamp units front and rear', []],
         ],
         live: [
-            { pid: '0C', label: 'Engine RPM', value: 842.1, unit: 'rpm', ok: true },
-            { pid: '0D', label: 'Vehicle speed', value: 0, unit: 'km/h', ok: true },
-            { pid: '05', label: 'Coolant temperature', value: 106.4, unit: '°C', ok: false },
-            { pid: '04', label: 'Calculated load', value: 30.3, unit: '%', ok: true },
-            { pid: '06', label: 'Short term fuel trim B1', value: 6.7, unit: '%', ok: true },
-            { pid: '07', label: 'Long term fuel trim B1', value: 9.0, unit: '%', ok: true },
-            { pid: '10', label: 'Mass air flow', value: 1.9, unit: 'g/s', ok: true },
-            { pid: '0F', label: 'Intake air temp', value: 29.8, unit: '°C', ok: true },
-            { pid: '42', label: 'Control module voltage', value: 12.6, unit: 'V', ok: true },
+            ['0C', 'Engine RPM', 842.1, 'rpm', true], ['0D', 'Vehicle speed', 0, 'km/h', true],
+            ['05', 'Coolant temperature', 106.4, '\u00b0C', false], ['04', 'Calculated load', 30.3, '%', true],
+            ['06', 'Short term fuel trim B1', 6.7, '%', true], ['07', 'Long term fuel trim B1', 9.0, '%', true],
+            ['10', 'Mass air flow', 1.9, 'g/s', true], ['0F', 'Intake air temp', 29.8, '\u00b0C', true],
+            ['42', 'Control module voltage', 12.6, 'V', true],
         ],
+    },
+
+    bite: {
+        device: { id: 'bite', label: 'Avionics BITE Test Set', model: 'AV-4', bus: 'ARINC 429',
+            lexicon: { codes: 'ACTIVE FAULTS', pending: 'INTERMITTENT', systems: 'LRU SCAN', system: 'LRU', code: 'FAULT', erase: 'CLEAR FAULT LOG', lamp: 'CAUTION', live: 'PARAMETERS', frame: 'SNAPSHOT', monitors: 'BITE STATUS' } },
+        plate: 'HELI 001', vin: '92RPVS6A5YDTN1BCF', blueprintLabel: 'Rotorcraft',
+        protocol: 'ARINC 429 / BITE', calibration: 'AGM-731204', odometer: 1284,
+        parts: [
+            ['ECM', 'Engine Control Module', 'ENGINE', 'engine', 'Turbine / Powerplant', '', 'Engine deck, behind the main cowling',
+                [['ENG-041', 'Turbine gas temperature exceedance recorded', 'high', 'stored'], ['ENG-014', 'N1 speed signal intermittent', 'medium', 'pending']]],
+            ['ECM', 'Engine Control Module', 'ENGINE', 'oil_system', 'Engine & Transmission Oil System', '', 'Engine and transmission oil coolers, upper deck',
+                [['ENG-055', 'Engine oil pressure low', 'high', 'stored']]],
+            ['ECM', 'Engine Control Module', 'ENGINE', 'fuel_system', 'Fuel Pumps & Lines', '', 'Fuel cells under the cabin floor', []],
+            ['RCU', 'Rotor & Drive Monitor', 'ROTOR', 'main_gearbox', 'Main Rotor Gearbox', '', 'Main gearbox on the cabin roof',
+                [['RTR-030', 'Main gearbox chip detector triggered', 'high', 'stored']]],
+            ['RCU', 'Rotor & Drive Monitor', 'ROTOR', 'main_rotor', 'Main Rotor Head & Blades', 'Blade 3', 'Main rotor head and blade 3',
+                [['RTR-112', 'Main rotor track out of limits, blade 3', 'medium', 'stored']]],
+            ['RCU', 'Rotor & Drive Monitor', 'ROTOR', 'tail_rotor', 'Tail Rotor & Blades', 'Blade 2', 'Tail rotor head, blade 2', []],
+            ['HYD', 'Hydraulic System Monitor', 'HYDR', 'hydraulics', 'Swashplate & Hydraulics', '', 'Hydraulic pack and swashplate, above the cabin', []],
+            ['FCU', 'Flight Control Unit', 'FLIGHT', 'avionics', 'Avionics & Instruments', '', 'Avionics rack behind the instrument panel', []],
+            ['FCU', 'Flight Control Unit', 'FLIGHT', 'controls', 'Cyclic, Collective & Linkages', '', 'Cyclic and collective linkages under the floor', []],
+        ],
+        live: [
+            ['0C', 'Engine RPM', 836.1, 'rpm', true], ['05', 'Turbine gas temp', 672.5, '\u00b0C', true],
+            ['T1', 'Main rotor RPM', 98.2, '% Nr', true], ['T2', 'Torque', 61.4, '%', true],
+            ['T3', 'Transmission oil press', 34.0, 'psi', false], ['42', 'Control module voltage', 27.4, 'V', true],
+        ],
+    },
+
+    marine: {
+        device: { id: 'marine', label: 'Marine Diagnostic Tool', model: 'MD-2', bus: 'SAE J1939',
+            lexicon: { codes: 'ACTIVE DTCs', pending: 'INACTIVE DTCs', systems: 'ECU SCAN', system: 'ECU', code: 'DTC', erase: 'RESET DTCs', lamp: 'WARN', live: 'LIVE DATA', frame: 'SNAPSHOT', monitors: 'SELF TEST' } },
+        plate: 'BOAT 001', vin: '9BKY41UYV9GEKD8X4', blueprintLabel: 'Watercraft',
+        protocol: 'SAE J1939 250k', calibration: 'AGM-114528', odometer: 3140,
+        parts: [
+            ['MCU', 'Marine Control Unit', 'MARINE', 'oil_system', 'Oil System', '', 'Sump, filter and cooler, low in the bilge',
+                [['SPN 100 FMI 1', 'Engine oil pressure below normal - most severe', 'high', 'stored']]],
+            ['MCU', 'Marine Control Unit', 'MARINE', 'cooling', 'Raw Water Cooling & Impeller', '', 'Raw water pump and impeller, on the engine front',
+                [['SPN 110 FMI 16', 'Engine coolant temperature above normal', 'medium', 'stored'], ['SPN 109 FMI 1', 'Coolant pressure below normal', 'high', 'stored']]],
+            ['MCU', 'Marine Control Unit', 'MARINE', 'air_filter', 'Intake & Flame Arrestor', '', 'Flame arrestor on the intake',
+                [['SPN 107 FMI 0', 'Air filter differential pressure above normal', 'low', 'stored']]],
+            ['MCU', 'Marine Control Unit', 'MARINE', 'gearbox', 'Outdrive & Gearbox', '', 'Outdrive and gear case, on the transom', []],
+            ['MCU', 'Marine Control Unit', 'MARINE', 'propeller', 'Propeller & Shaft', '', 'Propeller and shaft, below the transom', []],
+            ['MCU', 'Marine Control Unit', 'MARINE', 'bilge_pump', 'Bilge Pump', '', 'Bilge, lowest point of the hull', []],
+            ['BCM', 'Body Control Module', 'BODY', 'lights', 'Navigation Lights', '', 'Navigation lamps', []],
+        ],
+        live: [
+            ['0C', 'Engine RPM', 822.7, 'rpm', true], ['05', 'Coolant temperature', 121.8, '\u00b0C', false],
+            ['04', 'Calculated load', 27.3, '%', true], ['06', 'Short term fuel trim B1', 9.1, '%', false],
+            ['0A', 'Fuel rail pressure', 2.1, 'bar', true], ['42', 'Control module voltage', 12.1, 'V', true],
+        ],
+    },
+};
+
+const MODULE_ORDER = ['ECM', 'MCU', 'TCM', 'RCU', 'HYD', 'FCU', 'ABS', 'EPS', 'BCM'];
+
+/** Expands a fixture's flat part list into the shape the device expects. */
+function buildFixture(key) {
+    const f = DEVICE_FIXTURES[key] || DEVICE_FIXTURES.obd;
+
+    const codes = [];
+    const byModule = new Map();
+
+    for (const [moduleId, moduleLabel, short, id, label, location, where, rawCodes] of f.parts) {
+        const partCodes = rawCodes.map(([code, desc, severity, statusValue]) => ({ code, desc, severity, status: statusValue }));
+        for (const c of partCodes) {
+            codes.push({ ...c, component: id, componentLabel: label, module: moduleId, moduleLabel, location, where });
+        }
+        if (!byModule.has(moduleId)) byModule.set(moduleId, { id: moduleId, label: moduleLabel, short, parts: [] });
+        byModule.get(moduleId).parts.push({
+            id, label, where, location, codes: partCodes,
+            status: partCodes.some((c) => c.status === 'stored') ? 'fault' : partCodes.length ? 'pending' : 'ok',
+        });
+    }
+
+    const modules = MODULE_ORDER.filter((m) => byModule.has(m)).map((m) => {
+        const mod = byModule.get(m);
+        const flat = mod.parts.flatMap((p) => p.codes);
+        return { ...mod, stored: flat.filter((c) => c.status === 'stored').length, pending: flat.filter((c) => c.status === 'pending').length };
+    });
+
+    const rank = { high: 0, medium: 1, low: 2 };
+    codes.sort((a, b) => (a.status === b.status ? 0 : a.status === 'stored' ? -1 : 1) || (rank[a.severity] - rank[b.severity]));
+
+    const stored = codes.filter((c) => c.status === 'stored').length;
+
+    return {
+        device: f.device,
+        plate: f.plate, vin: f.vin, blueprint: key, blueprintLabel: f.blueprintLabel,
+        protocol: f.protocol, calibration: f.calibration, odometer: f.odometer,
+        mil: stored > 0,
+        counts: { stored, pending: codes.length - stored },
+        codes, modules,
+        live: f.live.map(([pid, label, value, unit, ok]) => ({ pid, label, value, unit, ok })),
         monitors: [
             { id: 'MIS', label: 'Misfire', state: 'failed' },
             { id: 'FUE', label: 'Fuel system', state: 'failed' },
@@ -261,5 +369,13 @@ export const devScanner = () => ({
             { id: 'O2S', label: 'Oxygen sensor', state: 'failed' },
         ],
         clearedAt: 0,
-    },
+    };
+}
+
+const currentDevice = () => new URLSearchParams(window.location.search).get('device') || 'obd';
+
+export const devScanner = () => ({
+    canErase: true,
+    liveInterval: 900,
+    scan: buildFixture(currentDevice()),
 });

@@ -14,13 +14,13 @@ AGM.scanner = {};
 
 let busy = false;
 
-/** Where the diagnostic port lives, per machine. Flavour for the progress bar. */
+/** Where the port lives, per machine. Flavour for the progress bar. */
 function portLocation(blueprint) {
     switch (blueprint) {
         case 'car': return 'under the dashboard';
         case 'bike': return 'under the seat';
         case 'heli': return 'in the avionics bay';
-        case 'plane': return 'on the panel sub-bay';
+        case 'plane': return 'in the panel sub-bay';
         case 'boat': return 'at the engine loom';
         default: return 'at the diagnostic port';
     }
@@ -55,6 +55,14 @@ AGM.scanner.run = async function (vehicle) {
         return null;
     }
 
+    /* Different machines speak different buses, so they need different tools.
+       Checked here for an instant answer, and again on the server. */
+    const device = AGM.Dtc.deviceFor(info.blueprint);
+    if (!device) {
+        AGM.ui.notify('Nothing on this reports to a diagnostic tool.', 'error');
+        return null;
+    }
+
     busy = true;
     const ped = PlayerPedId();
 
@@ -63,7 +71,7 @@ AGM.scanner.run = async function (vehicle) {
 
         const pluggedIn = await AGM.ui.progressCircle({
             duration: AGM.Config.scanner.hookupDuration,
-            label: `Finding the port ${portLocation(info.blueprint)}`,
+            label: `Connecting the ${device.model} ${portLocation(info.blueprint)}`,
             canCancel: true,
         });
         if (!pluggedIn) return null;
@@ -77,8 +85,16 @@ AGM.scanner.run = async function (vehicle) {
 
         if (!result || !result.ok) {
             const reason = result && result.reason;
-            if (reason === 'noItem') {
-                AGM.ui.notify(AGM.util.fmt(AGM.Config.locale.noItem, result.itemLabel || 'a diagnostic scanner'), 'error');
+            if (reason === 'wrongDevice') {
+                AGM.ui.notify(
+                    `A ${result.carrying} cannot talk to this. It runs ${result.bus} - you want the ${result.itemLabel}.`,
+                    'error', 'Wrong tool',
+                );
+            } else if (reason === 'noItem') {
+                AGM.ui.notify(
+                    AGM.util.fmt(AGM.Config.locale.noItem, result.itemLabel || device.label),
+                    'error',
+                );
             } else {
                 AGM.ui.notify(AGM.diagnose.reasonText(reason), 'error');
             }

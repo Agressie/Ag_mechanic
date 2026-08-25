@@ -15,7 +15,7 @@ Add to `ox_inventory/data/items.lua`, inside the `return { ... }` table:
     -- Consumables
     ['ducttape'] = { label = 'Duct Tape', weight = 120, close = true, client = { export = 'ag_mechanic.useImprovised' } },
     ['zipties'] = { label = 'Cable Ties', weight = 40, close = true, client = { export = 'ag_mechanic.useImprovised' } },
-    ['obd_scanner'] = { label = 'OBD Diagnostic Scanner', weight = 800, stack = false, close = true, client = { export = 'ag_mechanic.useScanner' } },
+    ['obd_scanner'] = { label = 'OBD-II Scan Tool', weight = 800, stack = false, close = true, client = { export = 'ag_mechanic.useScanner' } },
     ['mechanic_toolbox'] = { label = 'Mechanic Toolbox', weight = 4000, stack = false },
     ['mechanic_tablet'] = { label = 'Shop Tablet', weight = 700, stack = false, close = true, client = { export = 'ag_mechanic.useTablet' } },
 
@@ -55,6 +55,7 @@ Add to `ox_inventory/data/items.lua`, inside the `return { ... }` table:
     ['wiring_harness'] = { label = 'Wiring Harness & ECU', weight = 2000 },
 
     -- Aircraft
+    ['bite_tester'] = { label = 'Avionics BITE Test Set', weight = 6000, stack = false, close = true, client = { export = 'ag_mechanic.useScanner' } },
     ['turbine_module'] = { label = 'Turbine / Powerplant Module', weight = 120000 },
     ['rotor_gearbox'] = { label = 'Main Rotor Gearbox', weight = 80000 },
     ['main_rotor_blade'] = { label = 'Main Rotor Blade Set', weight = 60000 },
@@ -69,6 +70,7 @@ Add to `ox_inventory/data/items.lua`, inside the `return { ... }` table:
     ['avionics_unit'] = { label = 'Avionics Unit', weight = 4000 },
 
     -- Marine
+    ['marine_diagnostic'] = { label = 'Marine Diagnostic Tool', weight = 1800, stack = false, close = true, client = { export = 'ag_mechanic.useScanner' } },
     ['bilge_pump'] = { label = 'Bilge Pump', weight = 1500 },
 
     -- Performance Upgrades
@@ -101,13 +103,32 @@ Add to `ox_inventory/data/items.lua`, inside the `return { ... }` table:
 
 ```
 
-The three `client.export` entries are what make using an item do something:
+The `client.export` entries are what make using an item do something:
 
 | Item | Using it |
 | --- | --- |
 | `mechanic_tablet` | opens the tablet |
-| `obd_scanner` | plugs into the nearest vehicle and opens the scanner device |
+| `obd_scanner` | plugs into the nearest car or bike |
+| `bite_tester` | plugs into the nearest helicopter or aircraft |
+| `marine_diagnostic` | plugs into the nearest boat |
 | `ducttape` / `zipties` | opens the report filtered to what can be bodged |
+
+### The three diagnostic tools are not interchangeable
+
+A car scan tool speaks OBD-II over CAN; an aircraft reports built-in-test faults
+over ARINC 429; a marine diesel talks J1939. Bringing the wrong box to a job gets
+you a refusal naming the one you should have brought:
+
+| Tool | Reads | Bus |
+| --- | --- | --- |
+| `obd_scanner` — OBD-II Scan Tool | cars, bikes | OBD-II / CAN |
+| `bite_tester` — Avionics BITE Test Set | helicopters, aircraft | ARINC 429 |
+| `marine_diagnostic` — Marine Diagnostic Tool | boats | SAE J1939 |
+
+All three share one client export, because the *vehicle* decides which tool is
+valid — so a single item handler covers all of them. Which tool covers what is
+the `blueprints` field of the device table in `config/dtc.js`; merging or
+splitting them is a one-line edit.
 
 ## qb-inventory
 
@@ -122,12 +143,12 @@ names are the same:
 },
 ```
 
-`obd_scanner` is not optional flavour: without one in your inventory the scanner
-interaction is refused, server side. Everything the control modules know is
-behind that item.
+These are not optional flavour: without the *right* tool in your inventory the
+scan is refused, server side. Everything the control modules know is behind that
+item.
 
-For the three useable items, set `useable = true` and register the handler in
-your own server script:
+For the useable items, set `useable = true` and register the handler in your own
+server script:
 
 ```lua
 QBCore.Functions.CreateUseableItem('mechanic_tablet', function(source)
@@ -136,7 +157,7 @@ end)
 ```
 
 `ag_mechanic:client:useTablet` is the only event the resource listens for; the
-scanner and improvised repairs are reachable from the ox_target menu on the
+scanners and improvised repairs are reachable from the ox_target menu on the
 vehicle, so they need no item handler.
 
 ## No inventory resource at all

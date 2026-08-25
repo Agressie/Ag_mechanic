@@ -171,6 +171,41 @@ step('dtc -> components');
     }
 }
 
+step('diagnostic devices');
+{
+    const LEXICON_KEYS = ['codes', 'pending', 'systems', 'system', 'code', 'erase', 'lamp', 'live', 'frame', 'monitors'];
+    const claimed = new Map();
+
+    for (const device of AGM.Dtc.devices) {
+        if (!device.item) bad(`device '${device.id}' has no inventory item`);
+        else if (!AGM.Shop.entry(device.item)) bad(`device '${device.id}' item '${device.item}' is not in the catalogue`);
+
+        if (!device.model) bad(`device '${device.id}' has no model name`);
+        if (!device.protocol) bad(`device '${device.id}' has no protocol string`);
+        if (!device.blueprints.length) bad(`device '${device.id}' covers no vehicle types`);
+
+        for (const key of LEXICON_KEYS) {
+            if (!device.lexicon || !device.lexicon[key]) bad(`device '${device.id}' lexicon is missing '${key}'`);
+        }
+
+        for (const bp of device.blueprints) {
+            if (!AGM.Components.blueprints[bp]) { bad(`device '${device.id}' covers unknown blueprint '${bp}'`); continue; }
+            if (claimed.has(bp)) bad(`blueprint '${bp}' is claimed by both '${claimed.get(bp)}' and '${device.id}'`);
+            claimed.set(bp, device.id);
+        }
+    }
+
+    /* Every supported machine needs exactly one tool that can read it, or the
+       scanner interaction is silently impossible for that class. */
+    for (const bp of Object.keys(AGM.Components.blueprints)) {
+        if (!claimed.has(bp)) bad(`no diagnostic device covers '${bp}'`);
+        if (!AGM.Dtc.deviceFor(bp)) bad(`deviceFor('${bp}') returns nothing`);
+    }
+
+    const items = AGM.Dtc.deviceItems();
+    if (new Set(items).size !== items.length) bad('two devices share the same item');
+}
+
 step('both diagnostic tools matter on every machine');
 for (const bp of Object.keys(AGM.Components.blueprints)) {
     const visible = AGM.Dtc.visibleComponents(bp);

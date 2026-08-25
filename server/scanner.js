@@ -151,32 +151,63 @@ AGM.scanner.codes = function (record) {
     return out;
 };
 
-/** Per-module code counts, which is how the scanner answers "where". */
+/**
+ * The vehicle as a tree of systems.
+ *
+ * Each module lists the parts it actually watches and whether each one is
+ * healthy, so the tool can be walked system by system rather than only as a flat
+ * list of codes. A clean module is a real answer, so modules with nothing wrong
+ * are still listed.
+ */
 AGM.scanner.moduleScan = function (record, codes) {
-    const counts = new Map();
+    const blueprint = record.blueprint;
+
+    const byComponent = new Map();
     for (const code of codes) {
-        const current = counts.get(code.module) || { stored: 0, pending: 0 };
-        current[code.status] += 1;
-        counts.set(code.module, current);
+        if (!byComponent.has(code.component)) byComponent.set(code.component, []);
+        byComponent.get(code.component).push(code);
     }
 
-    /* Report every module this machine has, not only the faulty ones - a clean
-       module is a real answer. */
-    const present = new Set(
-        AGM.Components.list(record.blueprint)
-            .filter((c) => AGM.Dtc.visible(record.blueprint, c.id))
-            .map((c) => AGM.Dtc.module(record.blueprint, c.id)),
-    );
+    const byModule = new Map();
+    for (const comp of AGM.Components.list(blueprint)) {
+        if (!AGM.Dtc.visible(blueprint, comp.id)) continue;
+
+        const moduleId = AGM.Dtc.module(blueprint, comp.id);
+        const partCodes = byComponent.get(comp.id) || [];
+        const location = AGM.scanner.resolveLocation(record, comp.id);
+
+        const part = {
+            id: comp.id,
+            label: comp.label,
+            where: location.where,
+            location: location.label,
+            codes: partCodes.map((c) => ({
+                code: c.code, desc: c.desc, status: c.status, severity: c.severity,
+            })),
+            /* A scanner reports faults, not wear percentages - that is what a
+               hands-on inspection is for. */
+            status: partCodes.some((c) => c.status === 'stored') ? 'fault'
+                : partCodes.length ? 'pending' : 'ok',
+        };
+
+        if (!byModule.has(moduleId)) byModule.set(moduleId, []);
+        byModule.get(moduleId).push(part);
+    }
 
     return AGM.Dtc.modules
-        .filter((m) => present.has(m.id))
-        .map((m) => ({
-            id: m.id,
-            label: m.label,
-            short: m.short,
-            stored: (counts.get(m.id) || {}).stored || 0,
-            pending: (counts.get(m.id) || {}).pending || 0,
-        }));
+        .filter((m) => byModule.has(m.id))
+        .map((m) => {
+            const parts = byModule.get(m.id);
+            const flat = parts.flatMap((p) => p.codes);
+            return {
+                id: m.id,
+                label: m.label,
+                short: m.short,
+                stored: flat.filter((c) => c.status === 'stored').length,
+                pending: flat.filter((c) => c.status === 'pending').length,
+                parts,
+            };
+        });
 };
 
 /* --------------------------------------------------------------- sensor data */
@@ -293,8 +324,16 @@ const monitorState = (incomplete, failed) => (incomplete ? 'incomplete' : failed
 AGM.scanner.buildScan = function (record) {
     const codes = AGM.scanner.codes(record);
     const stored = codes.filter((c) => c.status === 'stored');
+    const device = AGM.Dtc.deviceFor(record.blueprint);
 
     return {
+        device: device ? {
+            id: device.id,
+            label: device.label,
+            model: device.model,
+            bus: device.bus,
+            lexicon: device.lexicon,
+        } : null,
         plate: record.plate,
         vin: record.key.startsWith('vin:') ? record.key.slice(4) : synthVin(record),
         blueprint: record.blueprint,
@@ -327,6 +366,31 @@ function synthVin(record) {
 /* ---------------------------------------------------------------------- rpc */
 
 /**
+ * Checks the player is holding the tool that can actually talk to this machine.
+ * Returns null when they are, or a refusal naming what they should have brought.
+ */
+function deviceCheck(src, blueprint) {
+    const device = AGM.Dtc.deviceFor(blueprint);
+    if (!device) return { ok: false, reason: 'unsupported' };
+
+    if (device.item && !AGM.inv.has(src, device.item, 1)) {
+        /* Carrying the wrong tool is worth saying out loud - it is a different
+           mistake from carrying none, and the player should know which. */
+        const carrying = AGM.Dtc.devices.find((d) => d.item && d.item !== device.item && AGM.inv.has(src, d.item, 1));
+        return {
+            ok: false,
+            reason: carrying ? 'wrongDevice' : 'noItem',
+            item: device.item,
+            itemLabel: AGM.Shop.label(device.item),
+            carrying: carrying ? AGM.Shop.label(carrying.item) : null,
+            bus: device.bus,
+        };
+    }
+    return null;
+}
+AGM.scanner.deviceCheck = deviceCheck;
+
+/**
  * Plugs in and reads the vehicle. Requires the scanner item, and grants the
  * player knowledge of every module-visible component: exact where a code names
  * the part, a rough condition where the module simply reports no fault.
@@ -335,10 +399,8 @@ AGM.rpc.register('scanner:scan', async (src, args) => {
     const ctx = await AGM.diagnose.resolveVehicle(src, args);
     if (ctx.error) return { ok: false, reason: ctx.error };
 
-    const item = AGM.Config.scanner.item;
-    if (item && !AGM.inv.has(src, item, 1)) {
-        return { ok: false, reason: 'noItem', item, itemLabel: AGM.Shop.label(item) };
-    }
+    const refusal = deviceCheck(src, ctx.record.blueprint);
+    if (refusal) return refusal;
 
     const { player, record } = ctx;
     const scan = AGM.scanner.buildScan(record);
@@ -355,6 +417,7 @@ AGM.rpc.register('scanner:scan', async (src, args) => {
 
     AGM.db.log('', player.name, 'scan', {
         plate: record.plate,
+        device: scan.device ? scan.device.id : null,
         stored: scan.counts.stored,
         pending: scan.counts.pending,
     });
@@ -367,8 +430,7 @@ AGM.rpc.register('scanner:live', async (src, args) => {
     const ctx = await AGM.diagnose.resolveVehicle(src, args);
     if (ctx.error) return null;
 
-    const item = AGM.Config.scanner.item;
-    if (item && !AGM.inv.has(src, item, 1)) return null;
+    if (deviceCheck(src, ctx.record.blueprint)) return null;
 
     return { ok: true, live: AGM.scanner.liveData(ctx.record) };
 });
@@ -396,10 +458,8 @@ AGM.rpc.register('scanner:erase', async (src, args) => {
     const ctx = await AGM.diagnose.resolveVehicle(src, args);
     if (ctx.error) return { ok: false, reason: ctx.error };
 
-    const item = AGM.Config.scanner.item;
-    if (item && !AGM.inv.has(src, item, 1)) {
-        return { ok: false, reason: 'noItem', item, itemLabel: AGM.Shop.label(item) };
-    }
+    const refusal = deviceCheck(src, ctx.record.blueprint);
+    if (refusal) return refusal;
 
     const { player, record } = ctx;
     if (AGM.Config.scanner.eraseRequiresJob && player.job.name !== AGM.Config.job.name) {
