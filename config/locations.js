@@ -73,7 +73,6 @@ AGM.Locations = {
         carryBox: { dict: 'anim@heists@box_carry@', clip: 'idle' },
         putDown: { dict: 'anim@narcotics@trash', clip: 'drop_front' },
         clipboard: { dict: 'missfam4', clip: 'base' },
-        sign: { dict: 'missheistdockssetup1clipboard@base', clip: 'base' },
         wrench: { dict: 'mini@repair', clip: 'fixing_a_ped' },
         underCar: { dict: 'anim@amb@clubhouse@tutorial@bkr_tut_ig3@', clip: 'machinic_loop_mechandplayer' },
         inspect: { dict: 'anim@amb@clubhouse@tutorial@bkr_tut_ig3@', clip: 'machinic_loop_mechandplayer' },

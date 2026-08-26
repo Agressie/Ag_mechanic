@@ -102,6 +102,32 @@ server.
 If the van cannot reach `park` within 45 seconds it unloads wherever it stopped
 rather than giving up, so an imperfect route degrades instead of breaking.
 
+Once parked it taps the horn a couple of times (`AGM.Shop.delivery.honk` in
+`config/shop.js`) so the shop knows it has arrived, then drops the pallet at
+`drop` and produces a clipboard at `sign`. While it is standing there waiting to
+be signed for, the van itself is swapped for a frozen static prop of the same
+model in the same spot — nobody can climb in and drive off with it. It is
+swapped back for a real, driveable van the moment the driver needs to leave; if
+that swap ever fails, the pallet and driver are simply despawned rather than
+leaving a stuck scene behind.
+
+Signing is done from a small NUI screen, not a hold-to-confirm animation:
+walk up to the driver, use the `Sign for the delivery` target option, and click
+the signature box. A pencil draws the signature in for you — nobody actually
+signs, the click is the confirmation.
+
+Nobody signs within `AGM.Shop.delivery.signTimeout` (15 minutes by default) and
+the driver gives up: the pallet goes back in the van and it drives back to
+`spawn` instead of `exit`, then despawns with the parts still aboard. The order
+reverts from `dispatched` to `returned` rather than being force-delivered, and
+the tablet's Orders tab shows a **Re-ship** button for it that starts the whole
+run again. `AGM.Shop.delivery.hardTimeout` is a separate, longer safety net that
+tears the whole scenario down regardless if something gets stuck.
+
+Only one delivery van is ever on the road at a time, across every shop — a
+second `Check in` / `Re-ship` while one is already out is refused with
+`deliveryBusy` until the first one finishes (delivered, returned, or aborted).
+
 ## Multiple shops
 
 `shops` is an array. Add a second entry with its own `id` and its own stash id

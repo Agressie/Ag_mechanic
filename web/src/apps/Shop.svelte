@@ -114,7 +114,9 @@
 
         const result = await rpc('shop:receive', { order: order.id });
         if (result && result.ok) {
-            notice = 'The van is on its way. Meet it out front and sign for it.';
+            notice = order.status === 'returned'
+                ? 'The van is heading back out. Meet it out front and sign for it this time.'
+                : 'The van is on its way. Meet it out front and sign for it.';
             const o = await rpc('shop:orders', { shop });
             if (o && o.ok) orders = o;
         } else {
@@ -254,6 +256,8 @@
                                     <span class="dim small">at the depot</span>
                                 {:else if order.status === 'dispatched'}
                                     <span class="dim small">van en route</span>
+                                {:else if order.status === 'returned'}
+                                    <span class="dim small">not signed for - back at the depot</span>
                                 {/if}
                             </td>
                             <td class="right mono">{money(order.cost)}</td>
@@ -261,6 +265,10 @@
                                 {#if order.status === 'ready'}
                                     <button class="primary" disabled={working || orders.deliveryActive} onclick={() => receive(order)}>
                                         {orders.deliveryActive ? 'Van already out' : 'Check in'}
+                                    </button>
+                                {:else if order.status === 'returned'}
+                                    <button class="primary" disabled={working || orders.deliveryActive} onclick={() => receive(order)}>
+                                        {orders.deliveryActive ? 'Van already out' : 'Re-ship'}
                                     </button>
                                 {:else if order.status === 'pending' && orders.canOrder}
                                     <button class="ghost" disabled={working} onclick={() => cancel(order)}>Cancel</button>
@@ -350,6 +358,7 @@
     }
     .status.ready { border-color: var(--warn); color: var(--warn); }
     .status.dispatched { border-color: var(--accent); color: var(--accent); }
+    .status.returned { border-color: var(--danger); color: var(--danger-text); }
     .status.delivered { border-color: var(--ok); color: var(--ok); }
     .status.cancelled { opacity: 0.5; }
 

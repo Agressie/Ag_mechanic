@@ -143,15 +143,18 @@ AGM.Shop = {
         /* Prop dropped in front of the shop. */
         boxProp: 'prop_boxpile_07d',
         clipboardProp: 'p_amb_clipboard_01',
-        penProp: 'prop_pencil_01',
         /* How long the driver will wait for a signature before giving up (ms).
-           On timeout the parts still land in the stash - the shop is not going
-           to lose a pallet over paperwork. */
-        signTimeout: 5 * 60 * 1000,
+           If nobody signs in time the pallet goes back in the van and it drives
+           back the way it came - see 'orders' on the tablet for the re-ship
+           button that sends it out again. */
+        signTimeout: 15 * 60 * 1000,
         /* Speed the van drives the last leg at (m/s). */
         approachSpeed: 12.0,
-        /* Cleanup guard: kill the whole scenario after this long regardless. */
-        hardTimeout: 12 * 60 * 1000,
+        /* Cleanup guard: kill the whole scenario after this long regardless,
+           whether that means it never got signed for or the return leg hung. */
+        hardTimeout: 20 * 60 * 1000,
+        /* Horn taps once parked, to let the shop know it has arrived. */
+        honk: { count: 2, onMs: 350, gapMs: 450 },
     },
 };
 

@@ -3,7 +3,14 @@
  * ============================================================================
  * The host client drives the whole thing: spawn the van and driver as networked
  * entities so everyone sees them, drive the route, carry a pallet out, set it
- * down, produce a clipboard, wait to be signed, then leave.
+ * down, produce a clipboard, wait to be signed, then leave - or, if nobody
+ * signs in time, load the pallet back up and drive back the way it came.
+ *
+ * While the van is sitting there waiting it is swapped for a frozen static
+ * object (same model, same spot) so nobody can climb in and drive off with the
+ * shop's delivery. It is swapped back for a real, driveable vehicle the moment
+ * the driver needs to leave - if that swap fails for any reason, the crate and
+ * the driver are despawned rather than leaving a stuck scene behind.
  *
  * Every entity is tracked in `spawned` and torn down through cleanup(), which is
  * called on success, on abort, on error and on resource stop. A delivery van
@@ -56,10 +63,29 @@ function track(entity) {
     return entity;
 }
 
+function untrack(entity) {
+    if (!scene) return;
+    const idx = scene.spawned.indexOf(entity);
+    if (idx !== -1) scene.spawned.splice(idx, 1);
+}
+
 function phase(name) {
     if (!scene || scene.aborted) return;
     scene.phase = name;
     emitNet('ag_mechanic:server:deliveryPhase', { shopId: scene.shopId, phase: name });
+}
+
+/** A couple of horn taps to let the shop know the van has arrived. */
+async function honkHorn(van, cfg) {
+    if (!scene || scene.aborted || !van || !DoesEntityExist(van)) return;
+    const count = Math.max(1, (cfg && cfg.count) || 2);
+    const onMs = (cfg && cfg.onMs) || 350;
+    const gapMs = (cfg && cfg.gapMs) || 450;
+    for (let i = 0; i < count; i++) {
+        if (!scene || scene.aborted || !DoesEntityExist(van)) return;
+        StartVehicleHorn(van, onMs, 0, false);
+        await wait(onMs + gapMs);
+    }
 }
 
 /* ------------------------------------------------------------------- cleanup */
@@ -101,6 +127,70 @@ AGM.deliveryScene.abort = function () {
     cleanup(false);
 };
 
+/* ---------------------------------------------------------- van lock/unlock */
+
+/**
+ * Swaps the parked van for a frozen static object of the same model, in the
+ * same spot, so nobody can climb in and drive off with it while the driver is
+ * stood around waiting for a signature. `restoreVanAsVehicle` swaps it back.
+ */
+async function lockVanAsObject() {
+    if (!scene || scene.aborted) return;
+    const van = scene.van;
+    if (!van || !DoesEntityExist(van)) return;
+
+    const coords = GetEntityCoords(van, true);
+    const heading = GetEntityHeading(van);
+    const model = GetEntityModel(van);
+
+    const obj = CreateObject(model, coords[0], coords[1], coords[2], true, true, false);
+    if (!obj || !DoesEntityExist(obj)) return;
+
+    SetEntityHeading(obj, heading);
+    PlaceObjectOnGroundProperly(obj);
+    FreezeEntityPosition(obj, true);
+    SetEntityCollision(obj, true, true);
+    SetEntityInvincible(obj, true);
+
+    untrack(van);
+    scene.spawned.push(obj);
+    DeleteVehicle(van);
+
+    scene.vanObject = obj;
+    scene.vanModel = model;
+    scene.vanCoords = coords;
+    scene.vanHeading = heading;
+    scene.van = 0;
+}
+
+/** Swaps the parked prop back for a driveable van. False if it could not. */
+async function restoreVanAsVehicle() {
+    if (!scene || scene.aborted) return false;
+    if (scene.van && DoesEntityExist(scene.van)) return true; /* was never locked */
+    if (!scene.vanModel || !scene.vanCoords) return false;
+
+    const loaded = await loadModel(scene.vanModel);
+    if (!loaded) return false;
+
+    const coords = scene.vanCoords;
+    const van = CreateVehicle(loaded, coords[0], coords[1], coords[2], scene.vanHeading || 0.0, true, false);
+    if (!van || !DoesEntityExist(van)) return false;
+
+    SetVehicleOnGroundProperly(van);
+    SetEntityAsMissionEntity(van, true, true);
+    SetModelAsNoLongerNeeded(loaded);
+
+    if (scene.vanObject && DoesEntityExist(scene.vanObject)) {
+        untrack(scene.vanObject);
+        DeleteEntity(scene.vanObject);
+    }
+    scene.vanObject = 0;
+
+    scene.spawned.push(van);
+    scene.van = van;
+    return true;
+}
+
 /* --------------------------------------------------------------------- driver */
 
 /** Puts the ox_target option on the driver so the paperwork can be signed. */
@@ -118,6 +208,14 @@ function addSignTarget(driver, shopId) {
     } catch (err) {
         AGM.log.error('could not add the signing target:', err && err.message);
     }
+}
+
+function removeSignTarget(driver) {
+    if (!scene || !scene.targetId) return;
+    try {
+        exports.ox_target.removeLocalEntity(driver, ['ag_mechanic_sign']);
+    } catch (_) { /* already gone */ }
+    scene.targetId = false;
 }
 
 /** Drops a pallet in front of the shop and leaves it there to be picked up. */
@@ -211,22 +309,32 @@ async function awaitSignature(driver, route, props, anims) {
     await waitFor(() => scene && (scene.signed || scene.wrapUp), AGM.Shop.delivery.signTimeout + 30000, 400);
 }
 
-/** Driver gets back in and leaves; the pallet stays where it was put. */
+/** Clears the clipboard/sign target once the wait is over, whichever way. */
+function clearWaitingProps(driver) {
+    if (!scene) return;
+    if (scene.clipboard && DoesEntityExist(scene.clipboard)) {
+        DeleteEntity(scene.clipboard);
+        untrack(scene.clipboard);
+    }
+    scene.clipboard = 0;
+    removeSignTarget(driver);
+}
+
+/** Signed for: driver gets back in and leaves; the pallet stays where it was put. */
 async function departure(driver, route) {
     phase('leaving');
     if (!scene || scene.aborted) return;
 
+    clearWaitingProps(driver);
     FreezeEntityPosition(driver, false);
     ClearPedTasks(driver);
 
-    if (scene.clipboard && DoesEntityExist(scene.clipboard)) {
-        DeleteEntity(scene.clipboard);
-    }
-    if (scene.targetId) {
-        try {
-            exports.ox_target.removeLocalEntity(driver, ['ag_mechanic_sign']);
-        } catch (_) { /* already gone */ }
-        scene.targetId = false;
+    const restored = await restoreVanAsVehicle();
+    if (!restored) {
+        AGM.log.warn('could not bring the delivery van back to drive off - despawning what is left');
+        phase('done');
+        cleanup(false);
+        return;
     }
 
     const van = scene.van;
@@ -246,6 +354,87 @@ async function departure(driver, route) {
     cleanup(true);
 }
 
+/** Not signed in time: the driver loads the pallet back up and heads home. */
+async function returnToDepot(driver, route, anims) {
+    phase('returning');
+    if (!scene || scene.aborted) return;
+
+    clearWaitingProps(driver);
+    FreezeEntityPosition(driver, false);
+    ClearPedTasks(driver);
+
+    const restored = await restoreVanAsVehicle();
+    if (!restored) {
+        AGM.log.warn('could not bring the delivery van back to load up - despawning what is left');
+        phase('done');
+        cleanup(false);
+        return;
+    }
+
+    const van = scene.van;
+
+    /* Walk back to the pallet and pick it up, if it ever got dropped. */
+    if (scene.box && DoesEntityExist(scene.box)) {
+        const boxCoords = GetEntityCoords(scene.box, true);
+        TaskGoStraightToCoord(driver, boxCoords[0], boxCoords[1], boxCoords[2], 1.0, 8000, GetEntityHeading(driver), 0.5);
+        await waitFor(() => AGM.util.dist(GetEntityCoords(driver, true), boxCoords) < 1.8, 10000);
+        if (!scene || scene.aborted) return;
+
+        if (await loadAnim(anims.putDown.dict)) {
+            TaskPlayAnim(driver, anims.putDown.dict, anims.putDown.clip, 8.0, -8.0, 1200, 0, 0, false, false, false);
+            await wait(1200);
+        }
+
+        FreezeEntityPosition(scene.box, false);
+        SetEntityCollision(scene.box, false, false);
+        AttachEntityToEntity(scene.box, driver, GetPedBoneIndex(driver, 60309), 0.05, 0.12, 0.25, 0.0, 0.0, 0.0, false, false, false, false, 2, true);
+
+        if (await loadAnim(anims.carryBox.dict)) {
+            TaskPlayAnim(driver, anims.carryBox.dict, anims.carryBox.clip, 8.0, -8.0, -1, 49, 0, false, false, false);
+        }
+    }
+
+    /* Carry it back to the van and load it. */
+    if (DoesEntityExist(van)) {
+        const rear = GetOffsetFromEntityInWorldCoords(van, 0.0, -3.2, 0.0);
+        TaskGoStraightToCoord(driver, rear[0], rear[1], rear[2], 1.0, 8000, GetEntityHeading(van), 0.5);
+        await waitFor(() => AGM.util.dist(GetEntityCoords(driver, true), rear) < 1.8, 10000);
+        if (!scene || scene.aborted) return;
+
+        SetVehicleDoorOpen(van, 2, false, false);
+        SetVehicleDoorOpen(van, 3, false, false);
+        await wait(500);
+    }
+
+    ClearPedTasks(driver);
+    if (scene.box && DoesEntityExist(scene.box)) {
+        DeleteEntity(scene.box);
+        untrack(scene.box);
+    }
+    scene.box = 0;
+
+    if (DoesEntityExist(van)) {
+        SetVehicleDoorShut(van, 2, false);
+        SetVehicleDoorShut(van, 3, false);
+    }
+
+    /* Drive back to where it came from and despawn - taking the parts with it. */
+    if (DoesEntityExist(van)) {
+        TaskEnterVehicle(driver, van, 12000, -1, 1.0, 1, 0);
+        await waitFor(() => GetVehiclePedIsIn(driver, false) === van, 14000);
+
+        if (scene && !scene.aborted && DoesEntityExist(van)) {
+            SetVehicleEngineOn(van, true, true, false);
+            const home = route.spawn.coords;
+            TaskVehicleDriveToCoordLongrange(driver, van, home[0], home[1], home[2], 18.0, 786603, 12.0);
+            await waitFor(() => AGM.util.dist(GetEntityCoords(van, true), home) < 25.0, 45000);
+        }
+    }
+
+    phase('done');
+    cleanup(false);
+}
+
 /* ---------------------------------------------------------------------- entry */
 
 onNet('ag_mechanic:client:deliveryStart', async (payload) => {
@@ -257,8 +446,13 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
     scene = {
         shopId: payload.shopId,
         orderId: payload.orderId,
+        lines: payload.lines || [],
         spawned: [],
         van: 0,
+        vanObject: 0,
+        vanModel: 0,
+        vanCoords: null,
+        vanHeading: 0,
         driver: 0,
         box: 0,
         clipboard: 0,
@@ -322,6 +516,7 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
 
         TaskVehicleTempAction(driver, van, 27, 2000);
         await wait(1200);
+        await honkHorn(van, payload.honk);
         SetVehicleEngineOn(van, false, true, true);
 
         TaskLeaveVehicle(driver, van, 0);
@@ -333,44 +528,52 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
         await unload(driver, route, payload, anims);
         if (!scene || scene.aborted) return;
 
+        /* Lock the van up while the driver stands around waiting to be signed
+           for, so nobody can climb in and take it. */
+        await lockVanAsObject();
+        if (!scene || scene.aborted) return;
+
         await awaitSignature(driver, route, payload, anims);
         if (!scene || scene.aborted) return;
 
-        await departure(driver, route);
+        if (scene.wrapUp && !scene.signed) {
+            await returnToDepot(driver, route, anims);
+        } else {
+            await departure(driver, route);
+        }
     } catch (err) {
         AGM.log.error('delivery scenario failed:', err && err.stack ? err.stack : err);
         cleanup(false);
     }
 });
 
-/** ox_target option on the driver. */
+/** ox_target option on the driver: opens the tablet-style signing screen. */
 onNet('ag_mechanic:client:signDelivery', async (data) => {
     const shopId = (data && data.shopId) || (scene && scene.shopId);
     if (!shopId) return;
+    if (!scene || scene.signed || scene.wrapUp) return;
 
-    const anims = AGM.Locations.anims;
-    const loaded = await loadAnim(anims.sign.dict);
-    const completed = await AGM.ui.progress({
-        duration: 4000,
-        label: 'Signing for the delivery',
-        canCancel: true,
-        anim: loaded ? { dict: anims.sign.dict, clip: anims.sign.clip, flag: 49 } : undefined,
-        disable: { car: true, move: true, combat: true },
+    const result = await AGM.nui.awaitResult('delivery', {
+        shopId,
+        orderId: scene.orderId,
+        lines: scene.lines || [],
     });
-    if (!completed) return;
+    AGM.nui.close();
+    if (!result || !result.signed) return;
+    if (!scene || scene.signed || scene.wrapUp) return;
 
-    const result = await AGM.rpc.call('delivery:sign', { shopId });
-    if (!result || !result.ok) {
+    const response = await AGM.rpc.call('delivery:sign', { shopId });
+    if (!response || !response.ok) {
         AGM.ui.notify(
-            result && result.reason === 'alreadySigned'
+            response && response.reason === 'alreadySigned'
                 ? 'Somebody already signed for this one.'
-                : AGM.diagnose.reasonText(result && result.reason),
+                : AGM.diagnose.reasonText(response && response.reason),
             'error',
         );
         return;
     }
 
-    const summary = result.lines.map((l) => `${l.qty}x ${l.label}`).join(', ');
+    const summary = response.lines.map((l) => `${l.qty}x ${l.label}`).join(', ');
     AGM.ui.notify(`${AGM.Config.locale.deliverySigned} ${summary}`, 'success', 'Delivery');
 });
 
@@ -379,7 +582,7 @@ onNet('ag_mechanic:client:deliverySigned', () => {
     if (scene) scene.signed = true;
 });
 
-onNet('ag_mechanic:client:deliveryWrapUp', () => {
+onNet('ag_mechanic:client:deliveryReturn', () => {
     if (scene) scene.wrapUp = true;
 });
 

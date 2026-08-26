@@ -9,7 +9,7 @@
 
 AGM.shop = {};
 
-const STATUS = { pending: 'pending', ready: 'ready', dispatched: 'dispatched', delivered: 'delivered', cancelled: 'cancelled' };
+const STATUS = { pending: 'pending', ready: 'ready', dispatched: 'dispatched', returned: 'returned', delivered: 'delivered', cancelled: 'cancelled' };
 
 function defaultShopId() {
     return (AGM.Locations.shops[0] || {}).id || '';
@@ -132,9 +132,12 @@ AGM.rpc.register('shop:orders', async (src, args) => {
     return {
         ok: true,
         orders,
-        open: orders.filter((o) => o.status === STATUS.pending || o.status === STATUS.ready || o.status === STATUS.dispatched),
+        open: orders.filter((o) => (
+            o.status === STATUS.pending || o.status === STATUS.ready
+            || o.status === STATUS.dispatched || o.status === STATUS.returned
+        )),
         canOrder: AGM.core.perm(src, 'order'),
-        deliveryActive: AGM.delivery ? AGM.delivery.isActive(shop.id) : false,
+        deliveryActive: AGM.delivery ? AGM.delivery.isBusy() : false,
     };
 });
 
@@ -218,19 +221,19 @@ AGM.rpc.register('shop:cancel', async (src, args) => {
 });
 
 /**
- * Checks a ready order in. This is what actually sends the van, so it is the
- * step the shop has to remember to do.
+ * Checks a ready (or previously returned) order in. This is what actually
+ * sends the van, so it is the step the shop has to remember to do.
  */
 AGM.rpc.register('shop:receive', async (src, args) => {
     if (!AGM.core.canOpenTablet(src)) return { ok: false, reason: 'noPermission' };
     const order = await AGM.shop.getOrder(args.order);
     if (!order) return { ok: false, reason: 'noOrder' };
-    if (order.status !== STATUS.ready) return { ok: false, reason: 'notReady' };
+    if (order.status !== STATUS.ready && order.status !== STATUS.returned) return { ok: false, reason: 'notReady' };
 
     const shop = resolveShop(order.shop);
     if (!shop) return { ok: false, reason: 'noShop' };
 
-    if (AGM.delivery.isActive(shop.id)) return { ok: false, reason: 'deliveryBusy' };
+    if (AGM.delivery.isBusy()) return { ok: false, reason: 'deliveryBusy' };
 
     const started = await AGM.delivery.start(shop, order, src);
     if (!started.ok) return started;

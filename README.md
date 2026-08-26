@@ -205,17 +205,26 @@ Nothing arrives on its own. Somebody has to **check the order in** from the shop
 app — and that is what sends the van:
 
 1. A van spawns down the road and drives the route to the shop.
-2. The driver parks, gets out, opens the back and carries a pallet to the
-   forecourt.
-3. They set it down, produce a clipboard, and wait.
-4. An employee walks up and signs for it via ox_target.
-5. The parts go into the stash, the driver gets back in and drives off.
+2. It parks up and taps the horn a couple of times to announce itself.
+3. The driver gets out, opens the back and carries a pallet to the forecourt.
+4. They set it down and produce a clipboard, and the van itself locks down —
+   swapped for an immovable prop so nobody can climb in and take it — while it
+   waits to be signed for.
+5. An employee walks up, uses the ox_target option, and signs on a small
+   on-screen delivery slip. Nobody actually signs anything; click the box and a
+   pencil fills the signature in.
+6. The van unlocks, the parts go into the stash, and the driver gets back in
+   and drives off.
 
-The pallet stays where it was put. If nobody signs within five minutes the parts
-go into the stash anyway — the shop is not going to lose a delivery over
-paperwork — and the driver leaves. If the hosting client disconnects mid-run the
-order is settled rather than left stuck, and a hard timeout tears the whole thing
-down so a van can never end up parked across your door forever.
+The pallet stays where it was put — only once it has actually been signed for.
+Nobody signs within **fifteen minutes** and the driver gives up: the pallet goes
+back in the van and it drives back the way it came, taking the parts with it.
+The order is not force-delivered — it drops back to a **returned** state, and
+the shop app's Orders tab gets a **Re-ship** button to send the van straight
+back out. Only one van is ever on the road at a time, across every shop. If the
+hosting client disconnects mid-run the order is returned rather than left stuck,
+and a hard timeout tears the whole thing down so a van can never end up parked
+across your door forever.
 
 ---
 

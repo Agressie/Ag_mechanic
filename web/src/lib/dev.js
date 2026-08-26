@@ -92,6 +92,15 @@ export const devUpgrades = () => ({
 
 export const devDiagnose = () => ({ bolts: 4, lines: 2, blueprint: 'car', blueprintLabel: 'Automobile', skilled: true });
 
+export const devDelivery = () => ({
+    shopId: 'lamesa',
+    orderId: 118,
+    lines: [
+        { item: 'air_filter', label: 'Air Filter', qty: 10 },
+        { item: 'tire', label: 'Tyre', qty: 8 },
+    ],
+});
+
 /*
  * Canned RPC responses for browser development, so the tablet's apps render
  * with plausible content instead of "unavailable". nui.js only reaches for
