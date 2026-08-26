@@ -47,6 +47,7 @@ client_scripts {
     'client/repair.js',
     'client/upgrades.js',
     'client/delivery.js',
+    'client/payment.js',
     'client/targets.js',
     'client/tablet.js',
     'client/main.js',
@@ -68,6 +69,7 @@ server_scripts {
     'server/personnel.js',
     'server/shop.js',
     'server/delivery.js',
+    'server/payment.js',
     'server/main.js',
 }
 

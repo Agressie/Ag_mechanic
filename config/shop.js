@@ -39,6 +39,7 @@ AGM.Shop = {
         P('marine_diagnostic', 'Marine Diagnostic Tool', 'marine', 2400, { packs: [1], blurb: 'J1939 reader for marine diesels.' }),
         P('mechanic_toolbox', 'Mechanic Toolbox', 'consumables', 900, { packs: [1, 2], blurb: 'Spanners, sockets, and a torque wrench nobody calibrates.' }),
         P('mechanic_tablet', 'Shop Tablet', 'consumables', 2500, { packs: [1, 2], blurb: 'Roster, stash and the parts account, in one greasy screen.' }),
+        P('card_reader', 'Mobile Card Reader', 'consumables', 650, { packs: [1, 2], blurb: 'Tap-to-pay, no wires. Bill a customer wherever the job is.' }),
 
         /* ---- engine ------------------------------------------------------ */
         P('air_filter', 'Air Filter', 'engine', 65, { blurb: 'Cheap, and neglected on every vehicle you will ever see.' }),

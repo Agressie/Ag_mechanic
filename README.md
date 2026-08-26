@@ -178,6 +178,28 @@ is a roadside job; a proper shunt is a truck.
 before deciding whether to phone for recovery. Towing itself is deliberately not
 part of this resource.
 
+### Getting paid
+
+Bennys is cashless. No cash handler exists at all — a mechanic keys an amount
+into a card machine and it sits **pending** until the customer taps to pay. No
+PIN, no invoice menu, nobody types a citizen id.
+
+Two machines, same screen:
+
+| | Where | Bill a customer |
+| --- | --- | --- |
+| **Fixed terminal** | on the counter | any on-shift mechanic, `ox_target` |
+| **Mobile reader** | the `card_reader` item | use the item anywhere on the job |
+
+The mechanic keys the total in on a little keypad screen — a real card-machine
+mock-up, not a themed menu — and it goes live. The customer then `ox_target`s
+the terminal (or the reader, held out in the mechanic's hand) and taps to pay:
+a card animates onto a contactless pad, a couple of pulse rings, and an
+**APPROVED** flash. The reader can be carrying more than one active charge at
+once, one per mechanic, so a full bay of roadside jobs doesn't queue behind a
+single machine. Unpaid charges expire on their own after a few minutes rather
+than sitting there forever.
+
 ### The tablet
 
 `F7`, `/tablet`, the item, or the tablet target at the shop. Access is decided by
@@ -261,14 +283,14 @@ Senior Mechanic, Shop Manager, Owner.
 
 | File | What lives there |
 | --- | --- |
-| `config/config.js` | job, grades and permissions, tablet, repair rules, diagnostics, economy, persistence, anti-abuse, all player-facing text |
+| `config/config.js` | job, grades and permissions, tablet, repair rules, diagnostics, economy, card payments, persistence, anti-abuse, all player-facing text |
 | `config/components.js` | the component health blueprints — the heart of it |
 | `config/tiers.js` | the named upgrade ladders |
 | `config/dtc.js` | fault codes, which system reports them, where each part physically is, and the three diagnostic devices |
 | `config/damage.js` | what each kind of abuse damages, and detection thresholds |
 | `config/handling.js` | how a performance axis maps onto handling fields |
 | `config/shop.js` | catalogue, prices, order and delivery timings |
-| `config/locations.js` | bays, lifts, stash, duty point and the delivery route |
+| `config/locations.js` | bays, lifts, stash, duty point, the card machine and the delivery route |
 | `config/classes.js` | GTA vehicle class → blueprint |
 
 Adding a component is one entry in `config/components.js`. Effect weights are

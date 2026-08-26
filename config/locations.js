@@ -46,6 +46,10 @@ AGM.Locations = {
         /* Where employees clock on. Set to false to skip duty entirely. */
         duty: { coords: [-341.5, -132.0, 39.0], radius: 1.2 },
 
+        /* Card machine on the counter. Set to false for no fixed terminal -
+           mobile readers still work without it. */
+        payment: { coords: [-330.2, -121.8, 39.0], heading: 340.0 },
+
         /* --- parts delivery ---------------------------------------------- */
         delivery: {
             /* Van spawns here, off-screen down the road. */

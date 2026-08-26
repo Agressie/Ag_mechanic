@@ -100,6 +100,19 @@ export const devDelivery = () => ({
     ],
 });
 
+const devKeypadPending = new URLSearchParams(window.location.search).get('pending') === '1';
+
+export const devKeypad = () => ({
+    device: new URLSearchParams(window.location.search).get('device') || 'shop',
+    pending: devKeypadPending ? { active: true, amount: 240, mechanic: 'Jesse Colt' } : { active: false },
+});
+
+export const devPayment = () => ({
+    device: new URLSearchParams(window.location.search).get('device') || 'shop',
+    amount: 240,
+    mechanic: 'Jesse Colt',
+});
+
 /*
  * Canned RPC responses for browser development, so the tablet's apps render
  * with plausible content instead of "unavailable". nui.js only reaches for

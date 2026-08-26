@@ -5,8 +5,12 @@
     import Diagnose from './screens/Diagnose.svelte';
     import Scanner from './screens/Scanner.svelte';
     import Delivery from './screens/Delivery.svelte';
+    import Keypad from './screens/Keypad.svelte';
+    import Payment from './screens/Payment.svelte';
     import { isBrowser } from './lib/nui.js';
-    import { devTablet, devReport, devUpgrades, devDiagnose, devScanner, devDelivery } from './lib/dev.js';
+    import {
+        devTablet, devReport, devUpgrades, devDiagnose, devScanner, devDelivery, devKeypad, devPayment,
+    } from './lib/dev.js';
 
     let screen = $state(null);
     let payload = $state({});
@@ -35,7 +39,10 @@
            worked on without launching the game. */
         if (isBrowser && !screen) {
             const wanted = new URLSearchParams(window.location.search).get('screen') || 'tablet';
-            const fixtures = { tablet: devTablet, report: devReport, upgrades: devUpgrades, diagnose: devDiagnose, scanner: devScanner, delivery: devDelivery };
+            const fixtures = {
+                tablet: devTablet, report: devReport, upgrades: devUpgrades, diagnose: devDiagnose,
+                scanner: devScanner, delivery: devDelivery, keypad: devKeypad, payment: devPayment,
+            };
             screen = wanted;
             payload = (fixtures[wanted] || devTablet)();
         }
@@ -57,5 +64,9 @@
         <Scanner {payload} />
     {:else if screen === 'delivery'}
         <Delivery {payload} />
+    {:else if screen === 'keypad'}
+        <Keypad {payload} />
+    {:else if screen === 'payment'}
+        <Payment {payload} />
     {/if}
 {/key}

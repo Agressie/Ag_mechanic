@@ -224,7 +224,12 @@ step('locations sanity');
   for (const mark of ['spawn', 'park', 'drop', 'sign', 'exit']) {
     if (!d || !d[mark] || !Array.isArray(d[mark].coords)) bad(`shop '${shop.id}' delivery is missing '${mark}'`);
   }
+  if (shop.payment && !Array.isArray(shop.payment.coords)) bad(`shop '${shop.id}' payment terminal has no coords`);
 }
+
+step('payment');
+if (!AGM.Shop.entry('card_reader')) bad(`'card_reader' item is not in the catalogue`);
+if (AGM.Config.payment.minAmount > AGM.Config.payment.maxAmount) bad('payment.minAmount is greater than payment.maxAmount');
 
 step('tablet apps map to grades that exist');
 for (const app of AGM.Config.tablet.apps) {

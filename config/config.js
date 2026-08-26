@@ -124,6 +124,33 @@ AGM.Config = {
         priceMultiplier: 1.0,
     },
 
+    /* ----------------------------------------------------------- payment */
+    /*
+     * Bennys is cashless. A mechanic keys an amount into a card machine and it
+     * sits 'pending' until a customer taps to pay - no PIN, no cash, and the
+     * mechanic never touches the customer's money directly.
+     *
+     *   shop     the fixed terminal on the counter, at Locations.shop.payment.
+     *            One charge waiting at a time.
+     *   mobile   the `card_reader` item. Each one a mechanic is holding tracks
+     *            its own charge, so several can be out on jobs at once.
+     */
+    payment: {
+        minAmount: 1,
+        maxAmount: 250000,
+        /* A charge nobody pays expires after this long (ms). */
+        pendingTimeout: 10 * 60 * 1000,
+        /* How close a card has to tap to the machine (m). */
+        shopDistance: 3.0,
+        mobileDistance: 2.5,
+        /* Props. The shop terminal is decorative set dressing - the actual
+           interaction point is Locations.shop.payment, not the prop itself. */
+        terminalProp: 'prop_till_01',
+        mobileProp: 'prop_phone_ing',
+        /* Held out towards the customer while a mobile charge is live. */
+        holdAnim: { dict: 'mp_common', clip: 'givetake1_a' },
+    },
+
     /* -------------------------------------------------------- persistence */
     persistence: {
         /* Save dirty vehicles to the database on this interval (ms). */
@@ -167,5 +194,13 @@ AGM.Config = {
         deliveryArrived: 'A parts delivery has arrived out front.',
         deliverySigned: 'Delivery signed for. Parts moved to the stash.',
         deliveryBusy: 'A delivery is already on its way.',
+        paymentSet: 'Charge set. Waiting for a card.',
+        paymentCancelled: 'Charge cancelled.',
+        paymentPaid: 'Payment approved.',
+        paymentNoCharge: 'Nothing to pay right now.',
+        paymentBusy: 'There is already a charge waiting on this machine.',
+        paymentTooFar: 'Stand closer to the machine.',
+        paymentFunds: 'The card was declined.',
+        paymentBadAmount: 'That is not a valid amount.',
     },
 };

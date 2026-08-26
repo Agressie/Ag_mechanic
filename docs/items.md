@@ -18,6 +18,7 @@ Add to `ox_inventory/data/items.lua`, inside the `return { ... }` table:
     ['obd_scanner'] = { label = 'OBD-II Scan Tool', weight = 800, stack = false, close = true, client = { export = 'ag_mechanic.useScanner' } },
     ['mechanic_toolbox'] = { label = 'Mechanic Toolbox', weight = 4000, stack = false },
     ['mechanic_tablet'] = { label = 'Shop Tablet', weight = 700, stack = false, close = true, client = { export = 'ag_mechanic.useTablet' } },
+    ['card_reader'] = { label = 'Mobile Card Reader', weight = 300, stack = false, close = true, client = { export = 'ag_mechanic.useCardReader' } },
 
     -- Engine & Induction
     ['air_filter'] = { label = 'Air Filter', weight = 500 },
@@ -112,6 +113,23 @@ The `client.export` entries are what make using an item do something:
 | `bite_tester` | plugs into the nearest helicopter or aircraft |
 | `marine_diagnostic` | plugs into the nearest boat |
 | `ducttape` / `zipties` | opens the report filtered to what can be bodged |
+| `card_reader` | holds the reader out and opens the keypad to bill a customer |
+
+### Card payments
+
+Bennys is cashless - there is no cash handler at all, only card. Two devices,
+same behaviour: a mechanic keys in an amount and it sits pending until a
+customer taps to pay, no PIN either side.
+
+| Device | Where | Bill a customer | Pay |
+| --- | --- | --- | --- |
+| fixed terminal | the counter, `Locations.shop.payment` | any mechanic, `ox_target` → "Bill a customer" | anyone, `ox_target` → "Pay with card" |
+| `card_reader` | wherever the mechanic is standing | use the item | `ox_target` the reader in the mechanic's hand |
+
+Neither device needs the toolbox, and billing is not gated by job grade - any
+mechanic on shift can charge a customer. See `docs/locations.md` for moving
+the fixed terminal and `config/config.js`'s `payment` block for amounts,
+timeouts and the props/animation used.
 
 ### The three diagnostic tools are not interchangeable
 
@@ -154,11 +172,16 @@ server script:
 QBCore.Functions.CreateUseableItem('mechanic_tablet', function(source)
     TriggerClientEvent('ag_mechanic:client:useTablet', source)
 end)
+
+QBCore.Functions.CreateUseableItem('card_reader', function(source)
+    TriggerClientEvent('ag_mechanic:client:useCardReader', source)
+end)
 ```
 
-`ag_mechanic:client:useTablet` is the only event the resource listens for; the
-scanners and improvised repairs are reachable from the ox_target menu on the
-vehicle, so they need no item handler.
+`ag_mechanic:client:useTablet` and `ag_mechanic:client:useCardReader` are the
+only events the resource listens for; the scanners and improvised repairs are
+reachable from the ox_target menu on the vehicle, so they need no item
+handler.
 
 ## No inventory resource at all
 

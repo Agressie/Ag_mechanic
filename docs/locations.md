@@ -38,6 +38,7 @@ Paste them as `[x, y, z]` arrays. Headings are single floats in degrees.
     lifts: [ ... ],               // where a mechanic stands to work on the bay
     stash: { ... },               // the shared parts store
     duty: { ... },                // clock on / off point
+    payment: { ... },             // the fixed card machine
     delivery: { ... },            // the parts van's route and marks
 }
 ```
@@ -81,6 +82,18 @@ stash: {
 
 Changing `id` after the shop has been in use orphans whatever was in the old
 stash — ox_inventory keys its contents on that string.
+
+### payment
+
+```js
+payment: { coords: [-330.2, -121.8, 39.0], heading: 340.0 }
+```
+
+Where the fixed card terminal sits. A decorative, non-networked prop
+(`Config.payment.terminalProp`) is placed here purely for set dressing; the
+actual `ox_target` zone is a sphere at these coords, sized by
+`Config.payment.shopDistance`. Set `payment: false` to run the shop with only
+the mobile `card_reader` item and no fixed terminal at all.
 
 ### delivery
 

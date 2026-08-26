@@ -56,6 +56,7 @@ on('onResourceStop', (resource) => {
     if (resource !== AGM.RESOURCE) return;
     for (const handle of intervals) clearInterval(handle);
     if (AGM.delivery) AGM.delivery.shutdown();
+    if (AGM.payment) AGM.payment.shutdown();
     /* Best effort: the runtime does not wait for us, but small flushes land. */
     AGM.vehicles.flush().catch(() => {});
 });
