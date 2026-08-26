@@ -76,7 +76,7 @@ AGM.upgrades.install = async function (info, category, tier, meta = {}) {
         AGM.ui.notify(
             result.removed
                 ? `${result.categoryLabel} back to standard.`
-                : `${result.label} fitted.${result.labour ? ` Labour: $${result.labour}.` : ''}`,
+                : `${result.label} fitted.`,
             'success',
         );
         return true;

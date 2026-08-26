@@ -325,7 +325,7 @@ AGM.scanner.buildScan = function (record) {
             lexicon: device.lexicon,
         } : null,
         plate: record.plate,
-        vin: record.key.startsWith('vin:') ? record.key.slice(4) : synthVin(record),
+        vin: synthVin(record),
         blueprint: record.blueprint,
         blueprintLabel: AGM.Classes.labels[record.blueprint] || record.blueprint,
         protocol: AGM.Dtc.protocol(record.blueprint),
@@ -340,7 +340,11 @@ AGM.scanner.buildScan = function (record) {
     };
 };
 
-/** A stable, plausible VIN for vehicles that have no real one. */
+/**
+ * A stable, plausible-looking VIN for the scanner's info page. Cosmetic only -
+ * derived from the vehicle key, so the same car always shows the same number.
+ * Nothing keys off it.
+ */
 function synthVin(record) {
     const alphabet = 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789';
     let out = '';

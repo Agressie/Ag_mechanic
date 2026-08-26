@@ -50,44 +50,21 @@ AGM.repair.bayAt = function (coords) {
  * three entry points below cannot drift apart.
  */
 async function context(src, args, opts = {}) {
-    const player = AGM.core.getPlayer(src);
-    if (!player) return { error: 'noPlayer' };
+    const ctx = await AGM.vehicles.resolve(src, args.netId, { maxExtra: 3, stationary: true });
+    if (ctx.error) return ctx;
 
-    const netId = Number(args.netId);
-    const entity = netId ? NetworkGetEntityFromNetworkId(netId) : 0;
-    if (!entity || !DoesEntityExist(entity)) return { error: 'noVehicle' };
-
-    const ped = GetPlayerPed(String(src));
-    const pedCoords = GetEntityCoords(ped);
-    const vehCoords = GetEntityCoords(entity);
-    if (AGM.util.dist(pedCoords, vehCoords) > AGM.Config.security.maxInteractDistance + 3) {
-        return { error: 'tooFar' };
-    }
-
-    if (GetEntitySpeed(entity) > 1.0) return { error: 'vehicleMoving' };
-
-    const plate = AGM.util.normalisePlate(args.plate || GetVehicleNumberPlateText(entity));
-    const blueprint = AGM.Classes.resolve(Number(args.classId), args.model);
-    if (!AGM.Classes.isSupported(blueprint)) return { error: 'unsupported' };
-
-    const key = AGM.util.vehicleKey(plate, args.vin);
-    const record = await AGM.vehicles.load(key, plate, args.model, blueprint);
-    if (!record) return { error: 'noRecord' };
-
-    const comp = AGM.Components.get(blueprint, String(args.component || ''));
+    const comp = AGM.Components.get(ctx.blueprint, String(args.component || ''));
     if (!comp) return { error: 'noComponent' };
 
-    if (!AGM.diagnose.knows(key, player.citizenid, comp.id)) return { error: 'diagnoseFirst' };
+    if (!AGM.diagnose.knows(ctx.key, ctx.player.citizenid, comp.id)) return { error: 'diagnoseFirst' };
 
     if (opts.requireJob) {
-        if (player.job.name !== AGM.Config.job.name) return { error: 'noJob' };
+        if (ctx.player.job.name !== AGM.Config.job.name) return { error: 'noJob' };
         const tool = AGM.Config.repair.toolItem;
         if (tool && !AGM.inv.has(src, tool, 1)) return { error: 'noTool' };
     }
 
-    const bay = AGM.repair.bayAt(vehCoords);
-
-    return { player, entity, netId, record, comp, key, bay, vehCoords };
+    return { ...ctx, comp, bay: AGM.repair.bayAt(ctx.vehCoords) };
 }
 
 /** Applies the result of a repair: persist, invalidate reports, tell clients. */
@@ -198,30 +175,19 @@ AGM.rpc.register('repair:workshop', (src, args) => properRepair(src, args, true)
  * it did and what it could not, rather than silently doing half a job.
  */
 AGM.rpc.register('repair:service', async (src, args) => {
-    const player = AGM.core.getPlayer(src);
-    if (!player) return { ok: false, reason: 'noPlayer' };
+    const ctx = await AGM.vehicles.resolve(src, args.netId, { maxExtra: 3, stationary: true });
+    if (ctx.error) return { ok: false, reason: ctx.error };
+
+    const { player, record, key, blueprint, netId } = ctx;
     if (player.job.name !== AGM.Config.job.name) return { ok: false, reason: 'noJob' };
 
     const tool = AGM.Config.repair.toolItem;
     if (tool && !AGM.inv.has(src, tool, 1)) return { ok: false, reason: 'noTool' };
 
-    const netId = Number(args.netId);
-    const entity = netId ? NetworkGetEntityFromNetworkId(netId) : 0;
-    if (!entity || !DoesEntityExist(entity)) return { ok: false, reason: 'noVehicle' };
-    if (GetEntitySpeed(entity) > 1.0) return { ok: false, reason: 'vehicleMoving' };
-
-    const plate = AGM.util.normalisePlate(args.plate || GetVehicleNumberPlateText(entity));
-    const blueprint = AGM.Classes.resolve(Number(args.classId), args.model);
-    if (!AGM.Classes.isSupported(blueprint)) return { ok: false, reason: 'unsupported' };
-
-    const key = AGM.util.vehicleKey(plate, args.vin);
-    const record = await AGM.vehicles.load(key, plate, args.model, blueprint);
-    if (!record) return { ok: false, reason: 'noRecord' };
-
     if (!AGM.diagnose.hasAny(key, player.citizenid)) return { ok: false, reason: 'diagnoseFirst' };
 
-    const vehCoords = GetEntityCoords(entity);
-    const bay = AGM.repair.bayAt(vehCoords);
+    const plate = record.plate;
+    const bay = AGM.repair.bayAt(ctx.vehCoords);
 
     const done = [];
     const skipped = [];
@@ -269,20 +235,11 @@ AGM.rpc.register('repair:service', async (src, args) => {
  * their diagnosis.
  */
 AGM.rpc.register('repair:triage', async (src, args) => {
-    const player = AGM.core.getPlayer(src);
-    if (!player) return null;
+    const ctx = await AGM.vehicles.resolve(src, args.netId, { maxExtra: 3 });
+    if (ctx.error) return null;
 
-    const netId = Number(args.netId);
-    const entity = netId ? NetworkGetEntityFromNetworkId(netId) : 0;
-    if (!entity || !DoesEntityExist(entity)) return null;
-
-    const plate = AGM.util.normalisePlate(args.plate || GetVehicleNumberPlateText(entity));
-    const key = AGM.util.vehicleKey(plate, args.vin);
-    const record = AGM.vehicles.peek(key);
-    if (!record) return null;
-
-    const report = AGM.diagnose.report(record, player.citizenid);
+    const report = AGM.diagnose.report(ctx.record, ctx.player.citizenid);
     if (!report) return { ok: false, reason: 'diagnoseFirst' };
 
-    return { ok: true, triage: report.triage, plan: AGM.Health.repairPlan(record.blueprint, record.health) };
+    return { ok: true, triage: report.triage, plan: AGM.Health.repairPlan(ctx.record.blueprint, ctx.record.health) };
 });

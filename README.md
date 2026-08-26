@@ -332,9 +332,9 @@ live data both tick without the game.
 
 ```lua
 -- server
-exports.ag_mechanic:getVehicleHealth(plate, vin)                  --> { component = 0-100 } | nil
-exports.ag_mechanic:getVehicleTiers(plate, vin)                   --> { category = { index, label } } | nil
-exports.ag_mechanic:applyVehicleWear(plate, vin, source, amount)  --> boolean
+exports.ag_mechanic:getVehicleHealth(plate)                  --> { component = 0-100 } | nil
+exports.ag_mechanic:getVehicleTiers(plate)                   --> { category = { index, label } } | nil
+exports.ag_mechanic:applyVehicleWear(plate, source, amount)  --> boolean
 ```
 
 ```lua
@@ -360,9 +360,21 @@ F8 when `Config.debug` is on.
 ## Notes on the implementation
 
 - **The server is the authority.** Clients detect abuse because they are the only
-  ones who can see RPM, wheel slip and impact direction, but every report is rate
-  limited, clamped per component, checked against the vehicle's blueprint, and
-  distance-checked against the player before it counts.
+  ones who can see RPM, wheel slip and impact direction, but a client can be
+  modified, so nothing it says is taken at face value:
+  - **A vehicle identifies itself.** The only thing a client sends is a network
+    id. The plate — which decides *which* health record is written to — and the
+    vehicle type — which decides which components it has — are both read
+    server-side off the entity. A client cannot name a car it is not looking at.
+  - **Wear is capped three ways**: per source, per component, and in total
+    across one report, all drawn from a single budget so listing every source at
+    once buys nothing. It also floors at `security.minHealthFromWear`, so
+    driving abuse can wreck a part but never kill it outright.
+  - **Only the driver reports.** Re-checked server-side against the driver's
+    seat, not taken on trust from the client that claims it.
+  - **Every RPC is throttled**, with longer per-handler cooldowns on the few
+    calls worth pacing. The loading spinners in the UI are waiting on those, so
+    the wait is real rather than an animation.
 - **No module system on the client.** FiveM's client JS runtime evaluates every
   file into one shared global scope, so everything hangs off a single `AGM`
   namespace with load order declared in `fxmanifest.lua`. The server does the

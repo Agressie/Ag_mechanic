@@ -23,6 +23,27 @@ Detection thresholds are in the same block. Raising `redlineRpm` to `0.98` means
 only real limiter-bouncing counts; lowering `hardBrakeDecel` makes every firm
 stop cost brake life.
 
+## The ceiling on driving damage
+
+Wear is measured on the client — it is the only thing that can see RPM and wheel
+slip — so `Config.security` puts a hard ceiling on what any one report may do,
+no matter what it claims:
+
+```js
+maxWearPerReport: 35,        // from any one source
+maxWearPerComponent: 20,     // to any one component
+maxWearTotalPerReport: 45,   // across the whole report, one shared budget
+minHealthFromWear: 25,       // driving abuse stops here
+```
+
+`minHealthFromWear` is the one with a gameplay effect worth knowing about:
+**driving can take a part down to 25% and no further.** That is well under its
+service threshold — the vehicle drives badly and needs a workshop — but it will
+never leave somebody stranded with a dead engine purely from how they drove. Set
+it to `0` for the old behaviour, where sustained abuse could kill a part outright.
+
+Repairs and the `applyVehicleWear` export are trusted code and ignore all four.
+
 ## Deciding what needs a tow
 
 Three fields on a component, in `config/components.js`:

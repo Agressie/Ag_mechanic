@@ -63,6 +63,8 @@ function reasonText(reason) {
         case 'funds': return L.paymentFunds;
         case 'badAmount': return L.paymentBadAmount;
         case 'noCharge': return L.paymentNoCharge;
+        case 'terminalDown': return L.paymentTerminalDown;
+        case 'tooFast': return L.tooFast;
         case 'noDevice': return 'That machine is not available right now.';
         case 'notYours': return 'That is not your reader.';
         default: return 'That did not work.';

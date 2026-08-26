@@ -75,16 +75,16 @@ export const devUpgrades = () => ({
     categories: [
         {
             id: 'brakes', label: 'Brakes', native: true, current: 1, tiers: [
-                { index: 0, label: 'Factory Brakes', blurb: 'Whatever the factory bolted on. Adequate, once.', item: null, itemLabel: null, labour: 0, install: 'mobile', fitted: false, have: true, perf: {} },
-                { index: 1, label: 'Steel Brakes', blurb: 'Drilled steel discs and organic pads. Honest and cheap.', item: 'brakes_steel', itemLabel: 'Steel Brake Kit', labour: 250, install: 'mobile', fitted: true, have: true, perf: { brakes: 1.08 } },
-                { index: 2, label: 'Titanium Brakes', blurb: 'Titanium-backed pads on a floating disc. Fade barely exists.', item: 'brakes_titanium', itemLabel: 'Titanium Brake Kit', labour: 600, install: 'mobile', fitted: false, have: false, perf: { brakes: 1.18 } },
-                { index: 3, label: 'Carbon Fibre Brakes', blurb: 'Carbon-ceramic. Cold they are useless, hot they are violent.', item: 'brakes_carbon', itemLabel: 'Carbon Fibre Brake Kit', labour: 1400, install: 'garage', fitted: false, have: true, perf: { brakes: 1.3 } },
+                { index: 0, label: 'Factory Brakes', blurb: 'Whatever the factory bolted on. Adequate, once.', item: null, itemLabel: null, install: 'mobile', fitted: false, have: true, perf: {} },
+                { index: 1, label: 'Steel Brakes', blurb: 'Drilled steel discs and organic pads. Honest and cheap.', item: 'brakes_steel', itemLabel: 'Steel Brake Kit', install: 'mobile', fitted: true, have: true, perf: { brakes: 1.08 } },
+                { index: 2, label: 'Titanium Brakes', blurb: 'Titanium-backed pads on a floating disc. Fade barely exists.', item: 'brakes_titanium', itemLabel: 'Titanium Brake Kit', install: 'mobile', fitted: false, have: false, perf: { brakes: 1.18 } },
+                { index: 3, label: 'Carbon Fibre Brakes', blurb: 'Carbon-ceramic. Cold they are useless, hot they are violent.', item: 'brakes_carbon', itemLabel: 'Carbon Fibre Brake Kit', install: 'garage', fitted: false, have: true, perf: { brakes: 1.3 } },
             ],
         },
         {
             id: 'chassis', label: 'Chassis & Armour', native: true, current: 0, tiers: [
-                { index: 0, label: 'Factory Chassis', blurb: 'Spot welds and good intentions.', item: null, labour: 0, install: 'mobile', fitted: true, have: true, perf: {} },
-                { index: 1, label: 'Welded Roll Cage', blurb: 'Multi-point cage tied into the floor. The shell stops flexing.', item: 'chassis_cage', itemLabel: 'Welded Roll Cage', labour: 900, install: 'garage', fitted: false, have: false, perf: { suspension: 1.04, steering: 1.03 } },
+                { index: 0, label: 'Factory Chassis', blurb: 'Spot welds and good intentions.', item: null, install: 'mobile', fitted: true, have: true, perf: {} },
+                { index: 1, label: 'Welded Roll Cage', blurb: 'Multi-point cage tied into the floor. The shell stops flexing.', item: 'chassis_cage', itemLabel: 'Welded Roll Cage', install: 'garage', fitted: false, have: false, perf: { suspension: 1.04, steering: 1.03 } },
             ],
         },
     ],

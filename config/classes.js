@@ -33,15 +33,62 @@ AGM.Classes = {
     overrides: {
         // blimp: 'plane',
     },
+
+    /*
+     * GetVehicleType() -> blueprint.
+     *
+     * GetVehicleClass is a client-only native, so the server cannot use it -
+     * and a client-supplied class id decides which component set a vehicle
+     * gets, which makes it worth forging. GetVehicleType *is* available
+     * server-side, so this is the mapping the server uses instead.
+     */
+    byType: {
+        automobile: 'car',
+        bike: 'bike',
+        quadbike: 'bike',
+        amphibious_automobile: 'car',
+        amphibious_quadbike: 'bike',
+        boat: 'boat',
+        heli: 'heli',
+        blimp: 'heli',
+        plane: 'plane',
+        bicycle: 'cycle',
+        submarine: 'unsupported',
+        submarinecar: 'car',
+        trailer: 'unsupported',
+        train: 'unsupported',
+    },
 };
 
-/** Resolve a blueprint from a GTA class id (and optional model name). */
-AGM.Classes.resolve = function (classId, modelName) {
-    if (modelName) {
-        const key = String(modelName).toLowerCase();
-        if (AGM.Classes.overrides[key]) return AGM.Classes.overrides[key];
+/**
+ * Override lookup for a model, which may arrive either as a spawn name
+ * ('blimp') on the client or as a model hash on the server, where there is no
+ * native to turn a hash back into a name. Both are matched, so `overrides`
+ * stays written in readable spawn names either way.
+ */
+function overrideFor(model) {
+    if (model === undefined || model === null || model === '') return null;
+
+    const asString = String(model).toLowerCase();
+    if (AGM.Classes.overrides[asString]) return AGM.Classes.overrides[asString];
+
+    const asNumber = Number(model);
+    if (Number.isFinite(asNumber) && asNumber !== 0 && typeof GetHashKey === 'function') {
+        for (const [name, blueprint] of Object.entries(AGM.Classes.overrides)) {
+            if (GetHashKey(name) === asNumber) return blueprint;
+        }
     }
-    return AGM.Classes.byClass[classId] || 'unsupported';
+    return null;
+}
+
+/** Resolve a blueprint from a GTA class id (and optional model). */
+AGM.Classes.resolve = function (classId, model) {
+    return overrideFor(model) || AGM.Classes.byClass[classId] || 'unsupported';
+};
+
+/** Resolve a blueprint from a GetVehicleType() string, server-side. */
+AGM.Classes.fromType = function (type, model) {
+    return overrideFor(model) || AGM.Classes.byType[String(type || '').toLowerCase()] || 'unsupported';
 };
 
 AGM.Classes.isSupported = function (blueprint) {

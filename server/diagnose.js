@@ -326,29 +326,8 @@ function inspectionFindings(record, quality) {
 }
 
 /** Shared vehicle resolution for both diagnostic tools. */
-async function resolveVehicle(src, args, maxExtra = 3) {
-    const player = AGM.core.getPlayer(src);
-    if (!player) return { error: 'noPlayer' };
-
-    const netId = Number(args.netId);
-    const entity = netId ? NetworkGetEntityFromNetworkId(netId) : 0;
-    if (!entity || !DoesEntityExist(entity)) return { error: 'noVehicle' };
-
-    const ped = GetPlayerPed(String(src));
-    if (AGM.util.dist(GetEntityCoords(ped), GetEntityCoords(entity)) > AGM.Config.security.maxInteractDistance + maxExtra) {
-        return { error: 'tooFar' };
-    }
-
-    const plate = AGM.util.normalisePlate(args.plate || GetVehicleNumberPlateText(entity));
-    const blueprint = AGM.Classes.resolve(Number(args.classId), args.model);
-    if (!AGM.Classes.isSupported(blueprint)) return { error: 'unsupported' };
-
-    const key = AGM.util.vehicleKey(plate, args.vin);
-    const record = await AGM.vehicles.load(key, plate, args.model, blueprint);
-    if (!record) return { error: 'noRecord' };
-
-    return { player, entity, netId, record, key };
-}
+const resolveVehicle = (src, args, maxExtra = 3) =>
+    AGM.vehicles.resolve(src, (args || {}).netId, { maxExtra });
 AGM.diagnose.resolveVehicle = resolveVehicle;
 
 AGM.rpc.register('diagnose:submit', async (src, args) => {
@@ -356,6 +335,11 @@ AGM.rpc.register('diagnose:submit', async (src, args) => {
     if (ctx.error) return { ok: false, reason: ctx.error };
 
     const { player, record } = ctx;
+
+    /* Getting your hands into a vehicle needs the toolbox, the same as any
+       other physical work on it. */
+    const tool = AGM.Config.repair.toolItem;
+    if (tool && !AGM.inv.has(src, tool, 1)) return { ok: false, reason: 'noTool' };
 
     /* Score comes from the minigame; the bonus is decided here, where it can be
        verified - a client cannot simply claim to be a mechanic. */

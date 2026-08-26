@@ -160,7 +160,24 @@ onNet('ag_mechanic:server:deliveryPhase', (payload) => {
     current.phase = phase;
     AGM.log.debug(`delivery phase -> ${phase}`);
 
-    if (phase === 'done') finish();
+    if (phase !== 'done') return;
+
+    /*
+     * 'done' only closes the delivery out. It cannot decide the order's fate -
+     * a host reporting it early (or a modified client sending it immediately)
+     * would otherwise leave the order stuck in 'dispatched' forever, paid for
+     * and undeliverable, and free the one-van slot for another run. An
+     * unsettled delivery goes back on the shelf instead.
+     */
+    if (current.outcome === 'pending') {
+        const state = current;
+        state.outcome = 'returned';
+        AGM.log.warn(`delivery for order #${state.orderId} reported done while unsettled - returning it`);
+        AGM.shop.getOrder(state.orderId)
+            .then((order) => (order ? returnOrder(AGM.Locations.shop, order, 'hostLeft') : null))
+            .catch((err) => AGM.log.error('delivery return on early done failed:', err && err.message));
+    }
+    finish();
 });
 
 /**

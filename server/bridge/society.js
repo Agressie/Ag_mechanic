@@ -37,6 +37,20 @@ AGM.society.detect = function () {
     return AGM.society.backend;
 };
 
+/**
+ * Can this account actually take a deposit right now?
+ *
+ * Worth asking *before* debiting a customer: with no banking resource running
+ * there is nowhere for the money to land, and a deposit that silently fails
+ * after the card has been charged destroys it. Checked by reading the balance
+ * back, which is the one operation every backend supports.
+ */
+AGM.society.canDeposit = function (account) {
+    if (AGM.society.backend === 'player') return false;
+    const balance = AGM.society.balance(account);
+    return Number.isFinite(balance);
+};
+
 AGM.society.balance = function (account) {
     switch (AGM.society.backend) {
         case 'renewed': {

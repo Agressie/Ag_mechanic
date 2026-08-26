@@ -166,6 +166,7 @@ function reasonText(reason) {
         case 'alreadyFine': return 'That part is already as good as it gets.';
         case 'deliveryBusy': return L.deliveryBusy;
         case 'funds': return L.orderFunds;
+        case 'tooFast': return L.tooFast;
         default: return 'That did not work.';
     }
 }

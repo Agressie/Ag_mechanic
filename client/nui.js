@@ -107,7 +107,7 @@ on('__cfx_nui:release', (_data, cb) => {
  */
 const ALLOWED_RPC = [
     'tablet:open', 'tablet:dashboard',
-    'personnel:roster', 'personnel:hire', 'personnel:fire', 'personnel:grade', 'personnel:forget',
+    'personnel:roster', 'personnel:hire', 'personnel:fire', 'personnel:grade',
     'shop:catalogue', 'shop:orders', 'shop:order', 'shop:cancel', 'shop:receive',
     'shop:stash', 'shop:stashOpen', 'shop:stashTake', 'shop:stashPut',
     'delivery:status',

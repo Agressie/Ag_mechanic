@@ -158,32 +158,42 @@ AGM.rpc.register('shop:order', async (src, args) => {
     }
     if (units > AGM.Shop.order.maxUnits) return { ok: false, reason: 'tooManyUnits' };
 
-    const openCount = await AGM.db.scalar(
-        `SELECT COUNT(*) FROM ag_mechanic_orders WHERE shop = ? AND status IN (?, ?, ?)`,
-        [shop.id, STATUS.pending, STATUS.ready, STATUS.dispatched],
-    ).catch(() => 0);
-    if (Number(openCount) >= AGM.Shop.order.maxOpen) return { ok: false, reason: 'tooManyOpen' };
-
     const cost = lines.reduce((a, l) => a + l.unit * l.qty, 0);
-    const payment = AGM.society.charge(src, cost, `ag_mechanic parts order (${shop.id})`);
-    if (!payment.ok) return { ok: false, reason: 'funds' };
-
     const now = Date.now();
     const readyAt = now + AGM.Shop.order.durationMs;
 
+    /*
+     * The open-order cap is enforced by the INSERT itself rather than by a
+     * COUNT followed by an INSERT. Two orders placed in the same instant would
+     * both pass a separate check - the row only lands here if the cap still
+     * holds at the moment of writing.
+     */
     const id = await AGM.db.insert(
         `INSERT INTO ag_mechanic_orders (shop, citizenid, ordered_by, lines_json, cost, status, placed_at, ready_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [shop.id, me.citizenid, me.name, JSON.stringify(lines), cost, STATUS.pending, now, readyAt],
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?
+         FROM (SELECT 1) AS placeholder
+         WHERE (
+            SELECT COUNT(*) FROM ag_mechanic_orders AS existing
+            WHERE existing.shop = ? AND existing.status IN (?, ?, ?)
+         ) < ?`,
+        [
+            shop.id, me.citizenid, me.name, JSON.stringify(lines), cost, STATUS.pending, now, readyAt,
+            shop.id, STATUS.pending, STATUS.ready, STATUS.dispatched, AGM.Shop.order.maxOpen,
+        ],
     ).catch((err) => {
         AGM.log.error('order insert failed:', err && err.message);
         return null;
     });
 
-    if (!id) {
-        /* Put the money back rather than silently eating it. */
-        AGM.society.deposit(cost, 'ag_mechanic order rollback');
-        return { ok: false, reason: 'noDatabase' };
+    /* No id means the WHERE excluded it: the cap was already reached. Nothing
+       has been charged at this point, so there is nothing to give back. */
+    if (!id) return { ok: false, reason: 'tooManyOpen' };
+
+    /* Charge only once the order is on the books. */
+    const payment = AGM.society.charge(src, cost, `ag_mechanic parts order (${shop.id})`);
+    if (!payment.ok) {
+        await AGM.db.update('DELETE FROM ag_mechanic_orders WHERE id = ?', [id]).catch(() => 0);
+        return { ok: false, reason: 'funds' };
     }
 
     AGM.db.log(shop.id, me.name, 'order_placed', { order: id, cost, units, paidFrom: payment.paidFrom });

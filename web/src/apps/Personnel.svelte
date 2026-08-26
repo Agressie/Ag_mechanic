@@ -42,7 +42,7 @@
         notYourself: 'You cannot do that to yourself.',
         alreadyEmployed: 'They already work here.',
         tooFar: 'They need to be standing next to you.',
-        noTarget: 'Nobody by that name or id.',
+        noTarget: 'The framework cannot reach that character right now.',
         notEmployed: 'They do not work here.',
         coreRefused: 'The framework refused the change.',
     };
@@ -122,14 +122,13 @@
         </thead>
         <tbody>
             {#each data.roster as member}
-                <tr class:stale={member.stale}>
+                <tr>
                     <td>
                         {member.name}
                         {#if member.citizenid === data.me.citizenid}<span class="you">you</span>{/if}
-                        {#if member.stale}<span class="tag">no longer in the system</span>{/if}
                     </td>
                     <td>
-                        {#if data.can.promote && member.citizenid !== data.me.citizenid && member.grade < data.me.grade && !member.stale}
+                        {#if data.can.promote && member.citizenid !== data.me.citizenid && member.grade < data.me.grade}
                             <select
                                 value={member.grade}
                                 onchange={(e) => act('personnel:grade', { citizenid: member.citizenid, grade: Number(e.currentTarget.value) }, 'Could not change their grade.')}
@@ -148,9 +147,7 @@
                         {member.online ? (member.onDuty ? 'On shift' : 'Online') : 'Offline'}
                     </td>
                     <td class="right">
-                        {#if member.stale && data.can.fire}
-                            <button class="ghost" onclick={() => act('personnel:forget', { citizenid: member.citizenid }, 'Could not clear the row.')}>Clear row</button>
-                        {:else if data.can.fire && member.citizenid !== data.me.citizenid && member.grade < data.me.grade}
+                        {#if data.can.fire && member.citizenid !== data.me.citizenid && member.grade < data.me.grade}
                             <button class="danger" onclick={() => act('personnel:fire', { citizenid: member.citizenid }, 'Could not let them go.')}>Let go</button>
                         {/if}
                     </td>
@@ -184,7 +181,6 @@
     }
     td { padding: 9px 10px; border-bottom: 1px solid var(--bg-raised); vertical-align: middle; }
     tr:hover td { background: var(--bg-raised); }
-    tr.stale td { opacity: 0.6; }
     .right { text-align: right; }
     td select { width: auto; padding: 4px 8px; font-size: 12px; }
 

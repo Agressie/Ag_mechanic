@@ -32,14 +32,6 @@ AGM.state.describe = function (vehicle) {
     const blueprint = AGM.Classes.resolve(classId, model);
     if (!AGM.Classes.isSupported(blueprint)) return null;
 
-    let vin = null;
-    try {
-        const bag = Entity(vehicle).state;
-        vin = bag && (bag.vin || bag.VIN) ? String(bag.vin || bag.VIN) : null;
-    } catch (_) {
-        vin = null;
-    }
-
     return {
         entity: vehicle,
         netId: NetworkGetNetworkIdFromEntity(vehicle),
@@ -47,22 +39,20 @@ AGM.state.describe = function (vehicle) {
         model,
         classId,
         blueprint,
-        vin,
-        key: AGM.util.vehicleKey(GetVehicleNumberPlateText(vehicle), vin),
+        key: AGM.util.vehicleKey(GetVehicleNumberPlateText(vehicle)),
     };
 };
 
-/** Arguments shape shared by every vehicle-scoped RPC. */
+/**
+ * Arguments shape shared by every vehicle-scoped RPC.
+ *
+ * Only the network id goes up. The server reads the plate and the vehicle type
+ * off the entity itself, because those decide which health record is written to
+ * and which components it has - so they are not ours to state.
+ */
 AGM.state.args = function (info, extra = {}) {
     if (!info) return null;
-    return {
-        netId: info.netId,
-        plate: info.plate,
-        model: info.model,
-        classId: info.classId,
-        vin: info.vin,
-        ...extra,
-    };
+    return { netId: info.netId, ...extra };
 };
 
 AGM.state.get = (netId) => AGM.state.vehicles.get(Number(netId)) || null;

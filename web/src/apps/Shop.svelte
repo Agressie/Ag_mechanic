@@ -18,6 +18,7 @@
     let search = $state('');
     let cart = $state({});
     let working = $state(false);
+    let placing = $state(false);
 
     async function load() {
         loading = true;
@@ -79,18 +80,26 @@
         nobodyAtShop: 'Somebody has to be at the shop to take the delivery.',
         tooLate: 'Too late to cancel that one.',
         noDatabase: 'The order database is unavailable.',
+        tooFast: 'Give the system a second to catch up.',
     };
 
     async function placeOrder() {
         if (!cartLines.length || working) return;
         working = true;
+        placing = true;
         error = '';
         notice = '';
 
-        const result = await rpc('shop:order', { lines: cartLines.map((l) => ({ item: l.item, qty: l.qty })) });
+        /* The order genuinely takes a beat to go through - the server paces this
+           call - so the button shows it working rather than freezing. */
+        const [result] = await Promise.all([
+            rpc('shop:order', { lines: cartLines.map((l) => ({ item: l.item, qty: l.qty })) }),
+            new Promise((resolve) => setTimeout(resolve, 1800)),
+        ]);
+
         if (result && result.ok) {
             cart = {};
-            notice = `Order #${result.order.id} placed. It will be at the depot ${relative(result.order.etaMs)}.`;
+            notice = `Order #${result.order.id} confirmed and placed. It will be at the depot ${relative(result.order.etaMs)}.`;
             const o = await rpc('shop:orders');
             if (o && o.ok) orders = o;
             const c = await rpc('shop:catalogue');
@@ -99,6 +108,7 @@
         } else {
             error = REASONS[result && result.reason] || 'The order was refused.';
         }
+        placing = false;
         working = false;
     }
 
@@ -218,7 +228,13 @@
                     class="primary order"
                     disabled={!cartLines.length || !catalogue.canOrder || working}
                     onclick={placeOrder}
-                >Place the order</button>
+                >
+                    {#if placing}
+                        <span class="spinner" aria-hidden="true"></span>Placing the order…
+                    {:else}
+                        Place the order
+                    {/if}
+                </button>
 
                 {#if !catalogue.canOrder}
                     <p class="faint small">Your grade cannot place orders.</p>
@@ -335,8 +351,20 @@
     .line-total { font-size: 11px; color: var(--text-dim); }
     .cart-total { display: flex; align-items: center; margin: 10px 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; }
     .total { font-size: 16px; font-weight: 600; color: var(--accent); }
-    .order { width: 100%; margin-top: 4px; }
+    .order {
+        width: 100%; margin-top: 4px;
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    }
     .cart p { margin: 8px 0 0; line-height: 1.4; }
+
+    .spinner {
+        width: 13px; height: 13px; flex: none;
+        border: 2px solid rgba(2, 18, 31, 0.28);
+        border-top-color: #02121f;
+        border-radius: 50%;
+        animation: spin 700ms linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th {

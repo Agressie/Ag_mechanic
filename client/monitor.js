@@ -274,12 +274,10 @@ function flush() {
     const hasWear = Object.keys(pending).length > 0;
     if (!hasWear && pendingDistance < 25) return;
 
+    /* The vehicle identifies itself server-side from the network id; all we
+       send is what we measured. */
     emitNet('ag_mechanic:server:wear', {
         netId: session.info.netId,
-        plate: session.info.plate,
-        model: session.info.model,
-        classId: session.info.classId,
-        vin: session.info.vin,
         wear: pending,
         distance: AGM.util.round(pendingDistance, 1),
     });

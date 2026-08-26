@@ -63,12 +63,13 @@ AGM.util.normalisePlate = function (plate) {
 };
 
 /**
- * Stable key for a vehicle. Prefers a real VIN-style state bag value if another
- * resource set one, so the health record survives a plate change.
+ * Stable key for a vehicle: its plate, and nothing else.
+ *
+ * The plate is always read from the entity server-side, never taken from the
+ * client, because this key decides which health record gets written to.
  */
-AGM.util.vehicleKey = function (plate, vin) {
-    const clean = vin ? String(vin).trim() : '';
-    return clean.length ? `vin:${clean}` : `plate:${AGM.util.normalisePlate(plate)}`;
+AGM.util.vehicleKey = function (plate) {
+    return `plate:${AGM.util.normalisePlate(plate)}`;
 };
 
 /** Sums the numeric values of an object. */
