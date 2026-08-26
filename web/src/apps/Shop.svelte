@@ -8,8 +8,6 @@
     import { rpc } from '../lib/nui.js';
     import { money, relative } from '../lib/format.js';
 
-    let { payload = {} } = $props();
-
     let tab = $state('catalogue');
     let catalogue = $state(null);
     let orders = $state(null);
@@ -21,13 +19,11 @@
     let cart = $state({});
     let working = $state(false);
 
-    const shop = $derived(payload.shop?.id);
-
     async function load() {
         loading = true;
         const [c, o] = await Promise.all([
-            rpc('shop:catalogue', { shop }),
-            rpc('shop:orders', { shop }),
+            rpc('shop:catalogue'),
+            rpc('shop:orders'),
         ]);
         if (c && c.ok) catalogue = c;
         if (o && o.ok) orders = o;
@@ -38,7 +34,7 @@
     $effect(() => {
         load();
         const handle = setInterval(async () => {
-            const o = await rpc('shop:orders', { shop });
+            const o = await rpc('shop:orders');
             if (o && o.ok) orders = o;
         }, 20000);
         return () => clearInterval(handle);
@@ -91,13 +87,13 @@
         error = '';
         notice = '';
 
-        const result = await rpc('shop:order', { shop, lines: cartLines.map((l) => ({ item: l.item, qty: l.qty })) });
+        const result = await rpc('shop:order', { lines: cartLines.map((l) => ({ item: l.item, qty: l.qty })) });
         if (result && result.ok) {
             cart = {};
             notice = `Order #${result.order.id} placed. It will be at the depot ${relative(result.order.etaMs)}.`;
-            const o = await rpc('shop:orders', { shop });
+            const o = await rpc('shop:orders');
             if (o && o.ok) orders = o;
-            const c = await rpc('shop:catalogue', { shop });
+            const c = await rpc('shop:catalogue');
             if (c && c.ok) catalogue = c;
             tab = 'orders';
         } else {
@@ -117,7 +113,7 @@
             notice = order.status === 'returned'
                 ? 'The van is heading back out. Meet it out front and sign for it this time.'
                 : 'The van is on its way. Meet it out front and sign for it.';
-            const o = await rpc('shop:orders', { shop });
+            const o = await rpc('shop:orders');
             if (o && o.ok) orders = o;
         } else {
             error = REASONS[result && result.reason] || 'Could not send the van out.';
@@ -130,7 +126,7 @@
         const result = await rpc('shop:cancel', { order: order.id });
         if (result && result.ok) {
             notice = `Order #${order.id} cancelled. ${money(result.refund)} back into the account.`;
-            const o = await rpc('shop:orders', { shop });
+            const o = await rpc('shop:orders');
             if (o && o.ok) orders = o;
         } else {
             error = REASONS[result && result.reason] || 'Could not cancel that.';

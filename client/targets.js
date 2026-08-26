@@ -107,68 +107,64 @@ AGM.targets.registerVehicles = function () {
 /* ------------------------------------------------------------------ shop zones */
 
 AGM.targets.registerShops = function () {
-    for (const shop of AGM.Locations.shops) {
-        for (const lift of shop.lifts || []) {
-            addSphereZone({
-                coords: lift.coords,
-                radius: lift.radius || 5.0,
-                debug: AGM.Config.debug,
-                options: [{
-                    name: `ag_mechanic_lift_${shop.id}_${lift.bay}`,
-                    label: `Work on whatever is on ${lift.bay}`,
-                    icon: 'fa-solid fa-car-on',
-                    distance: lift.radius || 5.0,
-                    groups: JOB_GROUP,
-                    event: 'ag_mechanic:client:targetLift',
-                    shopId: shop.id,
-                }],
-            });
-        }
+    const shop = AGM.Locations.shop;
 
-        if (shop.stash && shop.stash.point) {
-            addSphereZone({
-                coords: shop.stash.point.coords,
-                radius: shop.stash.point.radius || 1.4,
-                debug: AGM.Config.debug,
-                options: [{
-                    name: `ag_mechanic_stash_${shop.id}`,
-                    label: shop.stash.label,
-                    icon: 'fa-solid fa-boxes-stacked',
-                    distance: 2.0,
-                    groups: JOB_GROUP,
-                    event: 'ag_mechanic:client:targetStash',
-                    shopId: shop.id,
-                }, {
-                    name: `ag_mechanic_tablet_${shop.id}`,
-                    label: 'Shop tablet',
-                    icon: 'fa-solid fa-tablet-screen-button',
-                    distance: 2.0,
-                    groups: JOB_GROUP,
-                    event: 'ag_mechanic:client:targetTablet',
-                    shopId: shop.id,
-                }],
-            });
-        }
-
-        if (shop.duty) {
-            addSphereZone({
-                coords: shop.duty.coords,
-                radius: shop.duty.radius || 1.2,
-                debug: AGM.Config.debug,
-                options: [{
-                    name: `ag_mechanic_duty_${shop.id}`,
-                    label: 'Clock on / off',
-                    icon: 'fa-solid fa-clipboard-user',
-                    distance: 2.0,
-                    groups: JOB_GROUP,
-                    event: 'ag_mechanic:client:targetDuty',
-                    shopId: shop.id,
-                }],
-            });
-        }
-
-        if (shop.blip) addBlip(shop);
+    for (const lift of shop.lifts || []) {
+        addSphereZone({
+            coords: lift.coords,
+            radius: lift.radius || 5.0,
+            debug: AGM.Config.debug,
+            options: [{
+                name: `ag_mechanic_lift_${lift.bay}`,
+                label: `Work on whatever is on ${lift.bay}`,
+                icon: 'fa-solid fa-car-on',
+                distance: lift.radius || 5.0,
+                groups: JOB_GROUP,
+                event: 'ag_mechanic:client:targetLift',
+            }],
+        });
     }
+
+    if (shop.stash && shop.stash.point) {
+        addSphereZone({
+            coords: shop.stash.point.coords,
+            radius: shop.stash.point.radius || 1.4,
+            debug: AGM.Config.debug,
+            options: [{
+                name: 'ag_mechanic_stash',
+                label: shop.stash.label,
+                icon: 'fa-solid fa-boxes-stacked',
+                distance: 2.0,
+                groups: JOB_GROUP,
+                event: 'ag_mechanic:client:targetStash',
+            }, {
+                name: 'ag_mechanic_tablet',
+                label: 'Shop tablet',
+                icon: 'fa-solid fa-tablet-screen-button',
+                distance: 2.0,
+                groups: JOB_GROUP,
+                event: 'ag_mechanic:client:targetTablet',
+            }],
+        });
+    }
+
+    if (shop.duty) {
+        addSphereZone({
+            coords: shop.duty.coords,
+            radius: shop.duty.radius || 1.2,
+            debug: AGM.Config.debug,
+            options: [{
+                name: 'ag_mechanic_duty',
+                label: 'Clock on / off',
+                icon: 'fa-solid fa-clipboard-user',
+                distance: 2.0,
+                groups: JOB_GROUP,
+                event: 'ag_mechanic:client:targetDuty',
+            }],
+        });
+    }
+
+    if (shop.blip) addBlip(shop);
 };
 
 /** Map blip at the shop's front door. */
@@ -207,10 +203,9 @@ function entityFrom(data) {
     return AGM.state.nearestVehicle(6.0);
 }
 
-/** Vehicle sitting in one of a shop's bays, nearest to the player. */
-function vehicleInBay(shopId) {
-    const shop = AGM.Locations.shop(shopId);
-    if (!shop) return 0;
+/** Vehicle sitting in one of the shop's bays, nearest to the player. */
+function vehicleInBay() {
+    const shop = AGM.Locations.shop;
 
     const ped = PlayerPedId();
     const origin = GetEntityCoords(ped, true);
@@ -282,10 +277,10 @@ onNet('ag_mechanic:client:targetUpgrades', (data) => {
     AGM.upgrades.open(vehicle);
 });
 
-onNet('ag_mechanic:client:targetLift', async (data) => {
+onNet('ag_mechanic:client:targetLift', async () => {
     if (!AGM.state.isMechanic()) return AGM.ui.notify(AGM.Config.locale.noJob, 'error');
 
-    const vehicle = vehicleInBay(data && data.shopId);
+    const vehicle = vehicleInBay();
     if (!vehicle) return AGM.ui.notify('There is nothing on that lift.', 'error');
 
     /* On a lift, go straight to the report if there is one, otherwise diagnose. */
@@ -293,17 +288,17 @@ onNet('ag_mechanic:client:targetLift', async (data) => {
     if (!report) await AGM.diagnose.run(vehicle);
 });
 
-onNet('ag_mechanic:client:targetStash', async (data) => {
+onNet('ag_mechanic:client:targetStash', async () => {
     if (!AGM.state.isMechanic()) return AGM.ui.notify(AGM.Config.locale.noJob, 'error');
-    const result = await AGM.rpc.call('shop:stashOpen', { shop: data && data.shopId });
+    const result = await AGM.rpc.call('shop:stashOpen', {});
     if (!result || !result.ok) {
         /* No native stash: fall back to the tablet's own view. */
         AGM.tablet.open('inventory');
     }
 });
 
-onNet('ag_mechanic:client:targetTablet', (data) => {
-    AGM.tablet.open('home', data && data.shopId);
+onNet('ag_mechanic:client:targetTablet', () => {
+    AGM.tablet.open('home');
 });
 
 onNet('ag_mechanic:client:targetDuty', () => {

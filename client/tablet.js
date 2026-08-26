@@ -58,7 +58,7 @@ function stowTablet() {
 }
 
 /** Opens the tablet on `app`. */
-AGM.tablet.open = async function (app = 'home', shopId) {
+AGM.tablet.open = async function (app = 'home') {
     if (AGM.nui.open) return;
 
     const session = await AGM.rpc.call('tablet:open', {});
@@ -72,7 +72,6 @@ AGM.tablet.open = async function (app = 'home', shopId) {
         return;
     }
 
-    if (shopId && session.shop) session.shop.id = shopId;
     session.startApp = app;
 
     await holdTablet();

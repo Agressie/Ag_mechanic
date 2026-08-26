@@ -6,19 +6,15 @@
     import { rpc } from '../lib/nui.js';
     import { date } from '../lib/format.js';
 
-    let { payload = {} } = $props();
-
     let data = $state(null);
     let loading = $state(true);
     let error = $state('');
     let hiring = $state(false);
     let manualId = $state('');
 
-    const shop = $derived(payload.shop?.id);
-
     async function load() {
         loading = true;
-        const result = await rpc('personnel:roster', { shop });
+        const result = await rpc('personnel:roster');
         if (result && result.ok) {
             data = result;
             error = '';
@@ -32,7 +28,7 @@
 
     async function act(name, args, failure) {
         error = '';
-        const result = await rpc(name, { shop, ...args });
+        const result = await rpc(name, args);
         if (result && result.ok) {
             data = { ...data, roster: result.roster };
         } else {

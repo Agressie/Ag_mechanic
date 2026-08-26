@@ -215,7 +215,8 @@ for (const bp of Object.keys(AGM.Components.blueprints)) {
 }
 
 step('locations sanity');
-for (const shop of AGM.Locations.shops) {
+{
+  const shop = AGM.Locations.shop;
   if (!shop.bays || !shop.bays.length) bad(`shop '${shop.id}' has no bays`);
   if (!shop.stash) bad(`shop '${shop.id}' has no stash`);
   if (shop.job !== AGM.Config.job.name) bad(`shop '${shop.id}' job '${shop.job}' != Config.job.name '${AGM.Config.job.name}'`);

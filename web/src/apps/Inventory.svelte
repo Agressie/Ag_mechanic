@@ -8,19 +8,15 @@
      */
     import { rpc, clientAction } from '../lib/nui.js';
 
-    let { payload = {} } = $props();
-
     let data = $state(null);
     let loading = $state(true);
     let error = $state('');
     let search = $state('');
     let amounts = $state({});
 
-    const shop = $derived(payload.shop?.id);
-
     async function load() {
         loading = true;
-        const result = await rpc('shop:stash', { shop });
+        const result = await rpc('shop:stash');
         if (result && result.ok) {
             data = result;
             error = '';
@@ -49,7 +45,7 @@
 
     async function move(name, item) {
         error = '';
-        const result = await rpc(name, { shop, item, qty: qtyFor(item) });
+        const result = await rpc(name, { item, qty: qtyFor(item) });
         if (result && result.ok) {
             data = { ...data, items: result.items };
         } else {
@@ -65,7 +61,7 @@
     };
 
     async function openNative() {
-        const result = await rpc('shop:stashOpen', { shop });
+        const result = await rpc('shop:stashOpen');
         if (result && result.ok) clientAction('tabletClosed', {});
     }
 </script>

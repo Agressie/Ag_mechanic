@@ -36,10 +36,9 @@ function insideBox(point, bay) {
 
 /** Which shop bay (if any) these coordinates are inside. */
 AGM.repair.bayAt = function (coords) {
-    for (const shop of AGM.Locations.shops) {
-        for (const bay of shop.bays || []) {
-            if (insideBox(coords, bay)) return { shop, bay };
-        }
+    const shop = AGM.Locations.shop;
+    for (const bay of shop.bays || []) {
+        if (insideBox(coords, bay)) return { shop, bay };
     }
     return null;
 };

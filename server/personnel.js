@@ -83,7 +83,7 @@ async function upsertRow(shopId, player, grade, hiredBy) {
 AGM.rpc.register('personnel:roster', async (src, args) => {
     if (!AGM.core.canOpenTablet(src)) return { ok: false, reason: 'noPermission' };
     const me = AGM.core.getPlayer(src);
-    const shopId = String(args.shop || (AGM.Locations.shops[0] || {}).id || '');
+    const shopId = AGM.Locations.shop.id;
 
     return {
         ok: true,
@@ -131,7 +131,7 @@ AGM.rpc.register('personnel:hire', async (src, args) => {
     if (!AGM.core.perm(src, 'hire')) return { ok: false, reason: 'noPermission' };
 
     const me = AGM.core.getPlayer(src);
-    const shopId = String(args.shop || (AGM.Locations.shops[0] || {}).id || '');
+    const shopId = AGM.Locations.shop.id;
 
     /* Accept either a nearby player id or a citizen id typed into the tablet. */
     let target = null;
@@ -160,7 +160,7 @@ AGM.rpc.register('personnel:hire', async (src, args) => {
     AGM.db.log(shopId, me.name, 'hire', { target: target.name, citizenid: target.citizenid, grade });
 
     if (target.src) {
-        AGM.core.notify(target.src, `You have been taken on at ${shopLabel(shopId)}.`, 'success');
+        AGM.core.notify(target.src, `You have been taken on at ${shopLabel()}.`, 'success');
     }
     return { ok: true, roster: await AGM.personnel.roster(shopId) };
 });
@@ -169,7 +169,7 @@ AGM.rpc.register('personnel:fire', async (src, args) => {
     if (!AGM.core.perm(src, 'fire')) return { ok: false, reason: 'noPermission' };
 
     const me = AGM.core.getPlayer(src);
-    const shopId = String(args.shop || (AGM.Locations.shops[0] || {}).id || '');
+    const shopId = AGM.Locations.shop.id;
     const citizenid = String(args.citizenid || '');
     if (!citizenid) return { ok: false, reason: 'noTarget' };
     if (citizenid === me.citizenid) return { ok: false, reason: 'notYourself' };
@@ -196,7 +196,7 @@ AGM.rpc.register('personnel:grade', async (src, args) => {
     if (!AGM.core.perm(src, 'promote')) return { ok: false, reason: 'noPermission' };
 
     const me = AGM.core.getPlayer(src);
-    const shopId = String(args.shop || (AGM.Locations.shops[0] || {}).id || '');
+    const shopId = AGM.Locations.shop.id;
     const citizenid = String(args.citizenid || '');
     if (!citizenid) return { ok: false, reason: 'noTarget' };
     if (citizenid === me.citizenid) return { ok: false, reason: 'notYourself' };
@@ -228,7 +228,7 @@ AGM.rpc.register('personnel:grade', async (src, args) => {
 /** Clears a row for someone the core no longer knows about. */
 AGM.rpc.register('personnel:forget', async (src, args) => {
     if (!AGM.core.perm(src, 'fire')) return { ok: false, reason: 'noPermission' };
-    const shopId = String(args.shop || (AGM.Locations.shops[0] || {}).id || '');
+    const shopId = AGM.Locations.shop.id;
     const citizenid = String(args.citizenid || '');
     if (!citizenid || !AGM.db.ready) return { ok: false, reason: 'noTarget' };
 
@@ -243,7 +243,6 @@ function highestAssignable(me) {
     return Math.max(0, me.job.grade - 1);
 }
 
-function shopLabel(shopId) {
-    const shop = AGM.Locations.shop(shopId);
-    return shop ? shop.label : 'the workshop';
+function shopLabel() {
+    return AGM.Locations.shop.label;
 }

@@ -93,7 +93,6 @@ export const devUpgrades = () => ({
 export const devDiagnose = () => ({ bolts: 4, lines: 2, blueprint: 'car', blueprintLabel: 'Automobile', skilled: true });
 
 export const devDelivery = () => ({
-    shopId: 'lamesa',
     orderId: 118,
     lines: [
         { item: 'air_filter', label: 'Air Filter', qty: 10 },

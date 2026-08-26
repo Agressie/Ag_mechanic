@@ -11,14 +11,6 @@ AGM.shop = {};
 
 const STATUS = { pending: 'pending', ready: 'ready', dispatched: 'dispatched', returned: 'returned', delivered: 'delivered', cancelled: 'cancelled' };
 
-function defaultShopId() {
-    return (AGM.Locations.shops[0] || {}).id || '';
-}
-
-function resolveShop(shopId) {
-    return AGM.Locations.shop(String(shopId || defaultShopId()));
-}
-
 function rowToOrder(row) {
     const lines = AGM.db.json(row.lines_json, []) || [];
     return {
@@ -72,13 +64,13 @@ AGM.shop.tick = async function () {
 
     for (const row of due || []) {
         await AGM.shop.setStatus(row.id, STATUS.ready);
-        notifyShop(row.shop, `Order #${row.id} has arrived at the depot. Check it in on the tablet.`, 'inform');
+        notifyShop(`Order #${row.id} has arrived at the depot. Check it in on the tablet.`, 'inform');
         AGM.db.log(row.shop, 'system', 'order_ready', { order: Number(row.id) });
     }
 };
 
-/** Notifies every online employee of a shop. */
-function notifyShop(shopId, message, type = 'inform') {
+/** Notifies every online employee of the shop. */
+function notifyShop(message, type = 'inform') {
     for (const p of AGM.core.getPlayers()) {
         if (p.job.name !== AGM.Config.job.name) continue;
         AGM.core.notify(p.src, message, type);
@@ -88,10 +80,9 @@ AGM.shop.notifyShop = notifyShop;
 
 /* ---------------------------------------------------------------------- rpc */
 
-AGM.rpc.register('shop:catalogue', async (src, args) => {
+AGM.rpc.register('shop:catalogue', async (src) => {
     if (!AGM.core.canOpenTablet(src)) return { ok: false, reason: 'noPermission' };
-    const shop = resolveShop(args.shop);
-    if (!shop) return { ok: false, reason: 'noShop' };
+    const shop = AGM.Locations.shop;
 
     const stash = await AGM.inv.stashContents(shop);
     const inStock = new Map(stash.map((s) => [s.item, s.count]));
@@ -118,10 +109,10 @@ AGM.rpc.register('shop:catalogue', async (src, args) => {
     };
 });
 
-AGM.rpc.register('shop:orders', async (src, args) => {
+AGM.rpc.register('shop:orders', async (src) => {
     if (!AGM.core.canOpenTablet(src)) return { ok: false, reason: 'noPermission' };
-    const shop = resolveShop(args.shop);
-    if (!shop || !AGM.db.ready) return { ok: false, reason: 'noShop' };
+    if (!AGM.db.ready) return { ok: false, reason: 'noShop' };
+    const shop = AGM.Locations.shop;
 
     const rows = await AGM.db.query(
         `SELECT * FROM ag_mechanic_orders WHERE shop = ? ORDER BY id DESC LIMIT ?`,
@@ -145,8 +136,7 @@ AGM.rpc.register('shop:order', async (src, args) => {
     if (!AGM.core.perm(src, 'order')) return { ok: false, reason: 'noPermission' };
     if (!AGM.db.ready) return { ok: false, reason: 'noDatabase' };
 
-    const shop = resolveShop(args.shop);
-    if (!shop) return { ok: false, reason: 'noShop' };
+    const shop = AGM.Locations.shop;
     const me = AGM.core.getPlayer(src);
 
     /* Validate the cart before touching money. */
@@ -197,7 +187,7 @@ AGM.rpc.register('shop:order', async (src, args) => {
     }
 
     AGM.db.log(shop.id, me.name, 'order_placed', { order: id, cost, units, paidFrom: payment.paidFrom });
-    notifyShop(shop.id, `${me.name} placed order #${id}. Due ${AGM.util.relativeTime(readyAt - now)}.`, 'inform');
+    notifyShop(`${me.name} placed order #${id}. Due ${AGM.util.relativeTime(readyAt - now)}.`, 'inform');
 
     return { ok: true, order: await AGM.shop.getOrder(id), paidFrom: payment.paidFrom };
 });
@@ -230,12 +220,9 @@ AGM.rpc.register('shop:receive', async (src, args) => {
     if (!order) return { ok: false, reason: 'noOrder' };
     if (order.status !== STATUS.ready && order.status !== STATUS.returned) return { ok: false, reason: 'notReady' };
 
-    const shop = resolveShop(order.shop);
-    if (!shop) return { ok: false, reason: 'noShop' };
-
     if (AGM.delivery.isBusy()) return { ok: false, reason: 'deliveryBusy' };
 
-    const started = await AGM.delivery.start(shop, order, src);
+    const started = await AGM.delivery.start(AGM.Locations.shop, order, src);
     if (!started.ok) return started;
 
     await AGM.shop.setStatus(order.id, STATUS.dispatched);
@@ -244,10 +231,9 @@ AGM.rpc.register('shop:receive', async (src, args) => {
 
 /* -------------------------------------------------------------------- stash */
 
-AGM.rpc.register('shop:stash', async (src, args) => {
+AGM.rpc.register('shop:stash', async (src) => {
     if (!AGM.core.canOpenTablet(src)) return { ok: false, reason: 'noPermission' };
-    const shop = resolveShop(args.shop);
-    if (!shop) return { ok: false, reason: 'noShop' };
+    const shop = AGM.Locations.shop;
 
     return {
         ok: true,
@@ -264,18 +250,15 @@ AGM.rpc.register('shop:stash', async (src, args) => {
     };
 });
 
-AGM.rpc.register('shop:stashOpen', async (src, args) => {
+AGM.rpc.register('shop:stashOpen', async (src) => {
     if (!AGM.core.canOpenTablet(src)) return { ok: false, reason: 'noPermission' };
-    const shop = resolveShop(args.shop);
-    if (!shop) return { ok: false, reason: 'noShop' };
-    const opened = AGM.inv.openStash(src, shop);
+    const opened = AGM.inv.openStash(src, AGM.Locations.shop);
     return { ok: opened, reason: opened ? undefined : 'noNativeStash' };
 });
 
 AGM.rpc.register('shop:stashTake', async (src, args) => {
     if (!AGM.core.perm(src, 'stashTake')) return { ok: false, reason: 'noPermission' };
-    const shop = resolveShop(args.shop);
-    if (!shop) return { ok: false, reason: 'noShop' };
+    const shop = AGM.Locations.shop;
 
     const item = String(args.item || '');
     const qty = AGM.util.clamp(Math.floor(Number(args.qty) || 1), 1, 100);
@@ -295,8 +278,7 @@ AGM.rpc.register('shop:stashTake', async (src, args) => {
 
 AGM.rpc.register('shop:stashPut', async (src, args) => {
     if (!AGM.core.perm(src, 'stashPut')) return { ok: false, reason: 'noPermission' };
-    const shop = resolveShop(args.shop);
-    if (!shop) return { ok: false, reason: 'noShop' };
+    const shop = AGM.Locations.shop;
 
     const item = String(args.item || '');
     const qty = AGM.util.clamp(Math.floor(Number(args.qty) || 1), 1, 100);

@@ -1,7 +1,9 @@
 # Moving the shop
 
-Everything world-positioned lives in `config/locations.js`, in one block per
-shop, so relocating the whole business is a single edit.
+Everything world-positioned lives in one block in `config/locations.js`
+(`AGM.Locations.shop`), so relocating the whole business is a single edit.
+This resource runs one shop - there is no shop selector anywhere in the UI or
+the RPCs, they all just operate on that one block.
 
 The defaults are set up around the Los Santos Customs on Greenwich Pl. If you
 are putting the job somewhere else — a custom MLO, Benny's, an airfield — you
@@ -69,7 +71,7 @@ option finds whatever vehicle is parked in that bay and opens its report.
 
 ```js
 stash: {
-    id: 'ag_mechanic_lamesa',       // must be unique per shop
+    id: 'ag_mechanic_lamesa',       // stash key ox_inventory/qb-inventory use
     label: 'Auto Works Parts Store',
     slots: 250,
     weight: 1000000,                // grams
@@ -124,16 +126,9 @@ the tablet's Orders tab shows a **Re-ship** button for it that starts the whole
 run again. `AGM.Shop.delivery.hardTimeout` is a separate, longer safety net that
 tears the whole scenario down regardless if something gets stuck.
 
-Only one delivery van is ever on the road at a time, across every shop — a
-second `Check in` / `Re-ship` while one is already out is refused with
-`deliveryBusy` until the first one finishes (delivered, returned, or aborted).
-
-## Multiple shops
-
-`shops` is an array. Add a second entry with its own `id` and its own stash id
-and the whole system — tablet, orders, deliveries, bays — works per shop. Both
-will answer to the same `job`, so use `Config.job.grades` for who can do what
-rather than trying to separate access by shop.
+Only one delivery van is ever on the road at a time — a second `Check in` /
+`Re-ship` while one is already out is refused with `deliveryBusy` until the
+first one finishes (delivered, returned, or aborted).
 
 ## Blips
 

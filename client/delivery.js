@@ -72,7 +72,7 @@ function untrack(entity) {
 function phase(name) {
     if (!scene || scene.aborted) return;
     scene.phase = name;
-    emitNet('ag_mechanic:server:deliveryPhase', { shopId: scene.shopId, phase: name });
+    emitNet('ag_mechanic:server:deliveryPhase', { phase: name });
 }
 
 /** A couple of horn taps to let the shop know the van has arrived. */
@@ -194,7 +194,7 @@ async function restoreVanAsVehicle() {
 /* --------------------------------------------------------------------- driver */
 
 /** Puts the ox_target option on the driver so the paperwork can be signed. */
-function addSignTarget(driver, shopId) {
+function addSignTarget(driver) {
     try {
         exports.ox_target.addLocalEntity(driver, [{
             name: 'ag_mechanic_sign',
@@ -202,7 +202,6 @@ function addSignTarget(driver, shopId) {
             icon: 'fa-solid fa-file-signature',
             distance: 2.5,
             event: 'ag_mechanic:client:signDelivery',
-            shopId,
         }]);
         scene.targetId = true;
     } catch (err) {
@@ -302,7 +301,7 @@ async function awaitSignature(driver, route, props, anims) {
         TaskPlayAnim(driver, anims.clipboard.dict, anims.clipboard.clip, 4.0, -4.0, -1, 49, 0, false, false, false);
     }
 
-    addSignTarget(driver, scene.shopId);
+    addSignTarget(driver);
     AGM.ui.notify('The driver needs a signature before they can leave.', 'inform', 'Delivery');
 
     /* Held here until the server says it is signed, or times it out. */
@@ -444,7 +443,6 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
     }
 
     scene = {
-        shopId: payload.shopId,
         orderId: payload.orderId,
         lines: payload.lines || [],
         spawned: [],
@@ -548,13 +546,10 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
 });
 
 /** ox_target option on the driver: opens the tablet-style signing screen. */
-onNet('ag_mechanic:client:signDelivery', async (data) => {
-    const shopId = (data && data.shopId) || (scene && scene.shopId);
-    if (!shopId) return;
+onNet('ag_mechanic:client:signDelivery', async () => {
     if (!scene || scene.signed || scene.wrapUp) return;
 
     const result = await AGM.nui.awaitResult('delivery', {
-        shopId,
         orderId: scene.orderId,
         lines: scene.lines || [],
     });
@@ -562,7 +557,7 @@ onNet('ag_mechanic:client:signDelivery', async (data) => {
     if (!result || !result.signed) return;
     if (!scene || scene.signed || scene.wrapUp) return;
 
-    const response = await AGM.rpc.call('delivery:sign', { shopId });
+    const response = await AGM.rpc.call('delivery:sign', {});
     if (!response || !response.ok) {
         AGM.ui.notify(
             response && response.reason === 'alreadySigned'
