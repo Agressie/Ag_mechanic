@@ -151,64 +151,38 @@ AGM.deliveryScene.abort = function () {
 /* ---------------------------------------------------------- van lock/unlock */
 
 /**
- * Swaps the parked van for a frozen static object of the same model, in the
- * same spot, so nobody can climb in and drive off with it while the driver is
- * stood around waiting for a signature. `restoreVanAsVehicle` swaps it back.
+ * Pins the parked van in place so nobody can climb in and drive off with the
+ * shop's delivery while the driver is stood around waiting for a signature.
+ *
+ * This used to swap the van for a CreateObject copy of the same model. It never
+ * worked: a vehicle model is not an object archetype, so CreateObject returned
+ * 0 every time and the function bailed silently, leaving the van driveable.
+ * Freezing and locking the real van does the same job on the entity we already
+ * have - no second entity, no re-create, no window where the van is missing.
  */
-async function lockVanAsObject() {
+function lockVanInPlace() {
     if (!scene || scene.aborted) return;
     const van = scene.van;
     if (!van || !DoesEntityExist(van)) return;
 
-    const coords = GetEntityCoords(van, true);
-    const heading = GetEntityHeading(van);
-    const model = GetEntityModel(van);
-
-    const obj = CreateObject(model, coords[0], coords[1], coords[2], true, true, false);
-    if (!obj || !DoesEntityExist(obj)) return;
-
-    SetEntityHeading(obj, heading);
-    PlaceObjectOnGroundProperly(obj);
-    FreezeEntityPosition(obj, true);
-    SetEntityCollision(obj, true, true);
-    SetEntityInvincible(obj, true);
-
-    untrack(van);
-    scene.spawned.push(obj);
-    DeleteVehicle(van);
-
-    scene.vanObject = obj;
-    scene.vanModel = model;
-    scene.vanCoords = coords;
-    scene.vanHeading = heading;
-    scene.van = 0;
+    SetVehicleEngineOn(van, false, true, true);
+    SetVehicleDoorsLocked(van, 2);          /* locked for everyone, including the driver */
+    SetVehicleUndriveable(van, true);
+    FreezeEntityPosition(van, true);
+    scene.vanLocked = true;
 }
 
-/** Swaps the parked prop back for a driveable van. False if it could not. */
-async function restoreVanAsVehicle() {
+/** Hands the van back to its driver. False if there is no van left to unlock. */
+function unlockVan() {
     if (!scene || scene.aborted) return false;
-    if (scene.van && DoesEntityExist(scene.van)) return true; /* was never locked */
-    if (!scene.vanModel || !scene.vanCoords) return false;
-
-    const loaded = await ag_mechanic_delivery_loadModel(scene.vanModel);
-    if (!loaded) return false;
-
-    const coords = scene.vanCoords;
-    const van = CreateVehicle(loaded, coords[0], coords[1], coords[2], scene.vanHeading || 0.0, true, false);
+    const van = scene.van;
     if (!van || !DoesEntityExist(van)) return false;
 
-    SetVehicleOnGroundProperly(van);
-    SetEntityAsMissionEntity(van, true, true);
-    SetModelAsNoLongerNeeded(loaded);
-
-    if (scene.vanObject && DoesEntityExist(scene.vanObject)) {
-        untrack(scene.vanObject);
-        DeleteEntity(scene.vanObject);
-    }
-    scene.vanObject = 0;
-
-    scene.spawned.push(van);
-    scene.van = van;
+    FreezeEntityPosition(van, false);
+    SetVehicleUndriveable(van, false);
+    SetVehicleDoorsLocked(van, 1);
+    SetVehicleEngineOn(van, true, true, false);
+    scene.vanLocked = false;
     return true;
 }
 
@@ -349,7 +323,7 @@ async function departure(driver, route) {
     FreezeEntityPosition(driver, false);
     ClearPedTasks(driver);
 
-    const restored = await restoreVanAsVehicle();
+    const restored = unlockVan();
     if (!restored) {
         AGM.log.warn('could not bring the delivery van back to drive off - despawning what is left');
         phase('done');
@@ -383,7 +357,7 @@ async function returnToDepot(driver, route, anims) {
     FreezeEntityPosition(driver, false);
     ClearPedTasks(driver);
 
-    const restored = await restoreVanAsVehicle();
+    const restored = unlockVan();
     if (!restored) {
         AGM.log.warn('could not bring the delivery van back to load up - despawning what is left');
         phase('done');
@@ -468,10 +442,7 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
         lines: payload.lines || [],
         spawned: [],
         van: 0,
-        vanObject: 0,
-        vanModel: 0,
-        vanCoords: null,
-        vanHeading: 0,
+        vanLocked: false,
         driver: 0,
         box: 0,
         clipboard: 0,
@@ -581,7 +552,7 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
 
         /* Lock the van up while the driver stands around waiting to be signed
            for, so nobody can climb in and take it. */
-        await lockVanAsObject();
+        lockVanInPlace();
         if (!scene || scene.aborted) return;
 
         await awaitSignature(driver, route, payload, anims);
