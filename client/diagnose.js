@@ -101,7 +101,7 @@ AGM.diagnose.run = async function (vehicle) {
         const response = await AGM.rpc.call('diagnose:submit', AGM.state.args(info, { score }));
 
         if (!response || !response.ok) {
-            AGM.ui.notify(reasonText(response && response.reason), 'error');
+            AGM.ui.notify(AGM.ui.reasonText(response && response.reason), 'error');
             return null;
         }
 
@@ -147,28 +147,4 @@ AGM.diagnose.showLast = async function (vehicle) {
 };
 
 /** Shared translation of server refusal codes into something readable. */
-function reasonText(reason) {
-    const L = AGM.Config.locale;
-    switch (reason) {
-        case 'noJob': return L.noJob;
-        case 'noPermission': return L.noPermission;
-        case 'noTool': return L.noTool;
-        case 'notInBay': return L.notInBay;
-        case 'vehicleMoving': return L.vehicleMoving;
-        case 'tooFar': return L.noVehicle;
-        case 'noVehicle': return L.noVehicle;
-        case 'diagnoseFirst': return L.diagnoseFirst;
-        case 'fieldCapReached': return L.fieldCapReached;
-        case 'fieldNotPossible': return L.fieldNotPossible;
-        case 'needsWorkshop': return L.needsGarage;
-        case 'repairFailed': return L.repairFailed;
-        case 'unsupported': return 'This is not something a mechanic can work on.';
-        case 'alreadyFine': return 'That part is already as good as it gets.';
-        case 'deliveryBusy': return L.deliveryBusy;
-        case 'funds': return L.orderFunds;
-        case 'tooFast': return L.tooFast;
-        default: return 'That did not work.';
-    }
-}
-AGM.diagnose.reasonText = reasonText;
 

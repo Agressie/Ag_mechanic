@@ -5,11 +5,44 @@
  * ============================================================================
  */
 
-let started = false;
+let ag_mechanic_main_started = false;
+
+/*
+ * Every file in the manifest is evaluated into one shared scope, so a config
+ * file that never loaded - missing from disk, dropped from fxmanifest.lua, or
+ * killed by an earlier error - leaves a hole that only surfaces as "cannot read
+ * properties of undefined" somewhere unrelated. Name the missing file instead.
+ */
+const ag_mechanic_main_configFiles = {
+    Config: 'config/config.js',
+    Classes: 'config/classes.js',
+    Components: 'config/components.js',
+    Tiers: 'config/tiers.js',
+    Dtc: 'config/dtc.js',
+    Damage: 'config/damage.js',
+    Handling: 'config/handling.js',
+    Shop: 'config/shop.js',
+    Locations: 'config/locations.js',
+    util: 'shared/util.js',
+    Health: 'shared/health.js',
+};
+
+function ag_mechanic_main_requireConfig() {
+    const missing = Object.keys(ag_mechanic_main_configFiles)
+        .filter((key) => !AGM[key])
+        .map((key) => `AGM.${key} (${ag_mechanic_main_configFiles[key]})`);
+    if (!missing.length) return;
+    throw new Error(
+        `shared config did not load: ${missing.join(', ')} - check that the file is on disk, `
+        + 'is listed in fxmanifest.lua shared_scripts, and did not throw earlier in this console',
+    );
+}
 
 async function boot() {
-    if (started) return;
-    started = true;
+    if (ag_mechanic_main_started) return;
+    ag_mechanic_main_started = true;
+
+    ag_mechanic_main_requireConfig();
 
     await AGM.state.refreshJob();
 

@@ -6,12 +6,43 @@
  * ============================================================================
  */
 
-let booted = false;
-const intervals = [];
+let ag_mechanic_main_booted = false;
+const ag_mechanic_main_intervals = [];
+
+/*
+ * Same shared-scope hazard as the client: a config file that never loaded shows
+ * up as an undefined-property error somewhere unrelated. Name it instead.
+ */
+const ag_mechanic_main_configFiles = {
+    Config: 'config/config.js',
+    Classes: 'config/classes.js',
+    Components: 'config/components.js',
+    Tiers: 'config/tiers.js',
+    Dtc: 'config/dtc.js',
+    Damage: 'config/damage.js',
+    Handling: 'config/handling.js',
+    Shop: 'config/shop.js',
+    Locations: 'config/locations.js',
+    util: 'shared/util.js',
+    Health: 'shared/health.js',
+};
+
+function ag_mechanic_main_requireConfig() {
+    const missing = Object.keys(ag_mechanic_main_configFiles)
+        .filter((key) => !AGM[key])
+        .map((key) => `AGM.${key} (${ag_mechanic_main_configFiles[key]})`);
+    if (!missing.length) return;
+    throw new Error(
+        `shared config did not load: ${missing.join(', ')} - check that the file is on disk, `
+        + 'is listed in fxmanifest.lua shared_scripts, and did not throw earlier in this console',
+    );
+}
 
 async function boot() {
-    if (booted) return;
-    booted = true;
+    if (ag_mechanic_main_booted) return;
+    ag_mechanic_main_booted = true;
+
+    ag_mechanic_main_requireConfig();
 
     await AGM.db.migrate();
 
@@ -25,16 +56,16 @@ async function boot() {
     AGM.inv.registerStash(AGM.Locations.shop);
 
     /* Persist changed vehicles, expire caches, advance orders. */
-    intervals.push(setInterval(() => {
+    ag_mechanic_main_intervals.push(setInterval(() => {
         AGM.vehicles.flush().catch((err) => AGM.log.error('flush failed:', err && err.message));
     }, AGM.Config.persistence.saveInterval));
 
-    intervals.push(setInterval(() => {
+    ag_mechanic_main_intervals.push(setInterval(() => {
         AGM.vehicles.evict();
         AGM.diagnose.sweep();
     }, 5 * 60 * 1000));
 
-    intervals.push(setInterval(() => {
+    ag_mechanic_main_intervals.push(setInterval(() => {
         AGM.shop.tick().catch((err) => AGM.log.error('order tick failed:', err && err.message));
     }, 60 * 1000));
 
@@ -54,7 +85,7 @@ on('onResourceStart', (resource) => {
 
 on('onResourceStop', (resource) => {
     if (resource !== AGM.RESOURCE) return;
-    for (const handle of intervals) clearInterval(handle);
+    for (const handle of ag_mechanic_main_intervals) clearInterval(handle);
     if (AGM.delivery) AGM.delivery.shutdown();
     if (AGM.payment) AGM.payment.shutdown();
     /* Best effort: the runtime does not wait for us, but small flushes land. */

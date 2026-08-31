@@ -14,7 +14,7 @@ let animating = false;
 const TABLET_ANIM = { dict: 'amb@world_human_seat_wall_tablet@female@base', clip: 'base' };
 const TABLET_PROP = 'prop_cs_tablet';
 
-async function loadAnim(dict) {
+async function ag_mechanic_tablet_loadAnim(dict) {
     RequestAnimDict(dict);
     const deadline = GetGameTimer() + 3000;
     while (!HasAnimDictLoaded(dict) && GetGameTimer() < deadline) {
@@ -30,7 +30,7 @@ async function holdTablet() {
     animating = true;
 
     const ped = PlayerPedId();
-    if (await loadAnim(TABLET_ANIM.dict)) {
+    if (await ag_mechanic_tablet_loadAnim(TABLET_ANIM.dict)) {
         TaskPlayAnim(ped, TABLET_ANIM.dict, TABLET_ANIM.clip, 3.0, -1, -1, 49, 0, false, false, false);
     }
 

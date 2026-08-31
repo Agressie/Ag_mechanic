@@ -73,6 +73,40 @@ on('ag_mechanic:lua:inputResult', (token, json) => {
     resolve(parsed);
 });
 
+/*
+ * Server refusal reasons, in English. One table for the whole client: these
+ * used to live in both diagnose.js and payment.js, and because every file in a
+ * resource shares one scope the second declaration quietly replaced the first,
+ * so half the resource reported the wrong reason - or none at all.
+ *
+ * A few codes ('tooFar', 'funds') mean something different at a card machine
+ * than they do under a bonnet, so payment.js wraps this with its own wording
+ * rather than fighting over the same case labels.
+ */
+AGM.ui.reasonText = function (reason) {
+    const L = AGM.Config.locale;
+    switch (reason) {
+        case 'noJob': return L.noJob;
+        case 'noPermission': return L.noPermission;
+        case 'noTool': return L.noTool;
+        case 'notInBay': return L.notInBay;
+        case 'vehicleMoving': return L.vehicleMoving;
+        case 'tooFar': return L.noVehicle;
+        case 'noVehicle': return L.noVehicle;
+        case 'diagnoseFirst': return L.diagnoseFirst;
+        case 'fieldCapReached': return L.fieldCapReached;
+        case 'fieldNotPossible': return L.fieldNotPossible;
+        case 'needsWorkshop': return L.needsGarage;
+        case 'repairFailed': return L.repairFailed;
+        case 'unsupported': return 'This is not something a mechanic can work on.';
+        case 'alreadyFine': return 'That part is already as good as it gets.';
+        case 'deliveryBusy': return L.deliveryBusy;
+        case 'funds': return L.orderFunds;
+        case 'tooFast': return L.tooFast;
+        default: return 'That did not work.';
+    }
+};
+
 AGM.ui.notify = function (description, type = 'inform', title = 'Mechanic', extra = {}) {
     emit('ag_mechanic:lua:notify', JSON.stringify({ title, description, type, ...extra }));
 };

@@ -19,7 +19,7 @@
 
 AGM.payment = {};
 
-function oxTarget(fn, ...args) {
+function ag_mechanic_payment_oxTarget(fn, ...args) {
     try {
         if (!exports.ox_target || typeof exports.ox_target[fn] !== 'function') {
             AGM.log.error(`ox_target.${fn} is unavailable - is ox_target started?`);
@@ -32,11 +32,11 @@ function oxTarget(fn, ...args) {
     }
 }
 
-function addSphereZone(data) {
+function ag_mechanic_payment_addSphereZone(data) {
     emit('ag_mechanic:lua:addSphereZone', JSON.stringify(data));
 }
 
-async function loadModel(model) {
+async function ag_mechanic_payment_loadModel(model) {
     const hash = typeof model === 'string' ? GetHashKey(model) : model;
     RequestModel(hash);
     const deadline = GetGameTimer() + 5000;
@@ -46,7 +46,7 @@ async function loadModel(model) {
     return HasModelLoaded(hash) ? hash : null;
 }
 
-async function loadAnim(dict) {
+async function ag_mechanic_payment_loadAnim(dict) {
     RequestAnimDict(dict);
     const deadline = GetGameTimer() + 3000;
     while (!HasAnimDictLoaded(dict) && GetGameTimer() < deadline) {
@@ -55,19 +55,23 @@ async function loadAnim(dict) {
     return HasAnimDictLoaded(dict);
 }
 
-function reasonText(reason) {
+
+/*
+ * The generic table calls 'tooFar' a missing vehicle and 'funds' a shortfall on
+ * a parts order. At a card machine both mean something else, so translate the
+ * handful that differ here and defer on everything else.
+ */
+function ag_mechanic_payment_reasonText(reason) {
     const L = AGM.Config.locale;
     switch (reason) {
-        case 'noJob': return L.noJob;
         case 'tooFar': return L.paymentTooFar;
         case 'funds': return L.paymentFunds;
         case 'badAmount': return L.paymentBadAmount;
         case 'noCharge': return L.paymentNoCharge;
         case 'terminalDown': return L.paymentTerminalDown;
-        case 'tooFast': return L.tooFast;
         case 'noDevice': return 'That machine is not available right now.';
         case 'notYours': return 'That is not your reader.';
-        default: return 'That did not work.';
+        default: return AGM.ui.reasonText(reason);
     }
 }
 
@@ -87,7 +91,7 @@ async function openKeypad(device, netId) {
         if (response && response.ok) {
             AGM.ui.notify(AGM.Config.locale.paymentSet, 'success', 'Card Machine');
         } else {
-            AGM.ui.notify(reasonText(response && response.reason), 'error', 'Card Machine');
+            AGM.ui.notify(ag_mechanic_payment_reasonText(response && response.reason), 'error', 'Card Machine');
         }
     } else if (result.action === 'cancel') {
         await AGM.rpc.call('payment:cancel', { device, netId });
@@ -115,7 +119,7 @@ async function openPaymentScreen(device, netId) {
     if (response && response.ok) {
         AGM.ui.notify(AGM.Config.locale.paymentPaid, 'success', 'Card Machine');
     } else {
-        AGM.ui.notify(reasonText(response && response.reason), 'error', 'Card Machine');
+        AGM.ui.notify(ag_mechanic_payment_reasonText(response && response.reason), 'error', 'Card Machine');
     }
 }
 
@@ -127,7 +131,7 @@ let terminalProp = 0;
 async function spawnTerminalProp() {
     const shop = AGM.Locations.shop;
     if (!shop.payment) return;
-    const hash = await loadModel(AGM.Config.payment.terminalProp);
+    const hash = await ag_mechanic_payment_loadModel(AGM.Config.payment.terminalProp);
     if (!hash) return;
 
     const [x, y, z] = shop.payment.coords;
@@ -153,7 +157,7 @@ AGM.payment.registerShop = function () {
 
     spawnTerminalProp();
 
-    addSphereZone({
+    ag_mechanic_payment_addSphereZone({
         coords: shop.payment.coords,
         radius: AGM.Config.payment.shopDistance,
         debug: AGM.Config.debug,
@@ -190,7 +194,7 @@ onNet('ag_mechanic:client:paymentPayShop', () => openPaymentScreen('shop', 0));
 let held = null;
 
 AGM.payment.registerMobile = function () {
-    oxTarget('addModel', GetHashKey(AGM.Config.payment.mobileProp), [{
+    ag_mechanic_payment_oxTarget('addModel', GetHashKey(AGM.Config.payment.mobileProp), [{
         name: 'ag_mechanic_pay_mobile',
         label: 'Pay with card',
         icon: 'fa-solid fa-credit-card',
@@ -201,7 +205,7 @@ AGM.payment.registerMobile = function () {
 
 async function holdReader() {
     if (held) return;
-    const hash = await loadModel(AGM.Config.payment.mobileProp);
+    const hash = await ag_mechanic_payment_loadModel(AGM.Config.payment.mobileProp);
     if (!hash) return;
 
     const ped = PlayerPedId();
@@ -213,7 +217,7 @@ async function holdReader() {
     AttachEntityToEntity(prop, ped, GetPedBoneIndex(ped, 60309), 0.05, 0.03, 0.0, 10.0, 0.0, 0.0, true, true, false, true, 2, true);
 
     const anim = AGM.Config.payment.holdAnim;
-    if (await loadAnim(anim.dict)) {
+    if (await ag_mechanic_payment_loadAnim(anim.dict)) {
         TaskPlayAnim(ped, anim.dict, anim.clip, 3.0, -1, -1, 49, 0, false, false, false);
     }
 

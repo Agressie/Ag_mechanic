@@ -137,7 +137,7 @@ AGM.repair.perform = async function (info, componentId, mode, meta = {}) {
             if (reason === 'noItem') {
                 AGM.ui.notify(AGM.util.fmt(AGM.Config.locale.noItem, result.itemLabel || result.item || 'a part'), 'error');
             } else {
-                AGM.ui.notify(AGM.diagnose.reasonText(reason), 'error');
+                AGM.ui.notify(AGM.ui.reasonText(reason), 'error');
             }
             return false;
         }
@@ -205,7 +205,7 @@ AGM.repair.fullService = async function (info) {
 
         const result = await AGM.rpc.call('repair:service', AGM.state.args(info));
         if (!result || !result.ok) {
-            AGM.ui.notify(AGM.diagnose.reasonText(result && result.reason), 'error');
+            AGM.ui.notify(AGM.ui.reasonText(result && result.reason), 'error');
             return false;
         }
 

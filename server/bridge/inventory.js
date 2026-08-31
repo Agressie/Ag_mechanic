@@ -15,7 +15,7 @@ AGM.inv = {};
 
 const ag_mechanic_inventory_started = (res) => GetResourceState(res) === 'started';
 
-function tryExport(resource, name, ...args) {
+function ag_mechanic_inventory_tryExport(resource, name, ...args) {
     try {
         /* `global.exports` because server scripts are CommonJS modules, where the
            bare `exports` identifier is module.exports. */
@@ -59,13 +59,13 @@ AGM.inv.count = function (src, item) {
     const id = Number(src);
     switch (AGM.inv.backend) {
         case 'ox': {
-            const n = tryExport('ox_inventory', 'GetItemCount', id, item);
+            const n = ag_mechanic_inventory_tryExport('ox_inventory', 'GetItemCount', id, item);
             return Number(n) || 0;
         }
         case 'qb': {
-            let n = tryExport('qb-inventory', 'GetItemCount', id, item);
+            let n = ag_mechanic_inventory_tryExport('qb-inventory', 'GetItemCount', id, item);
             if (n === undefined) {
-                const entry = tryExport('qb-inventory', 'GetItemByName', id, item);
+                const entry = ag_mechanic_inventory_tryExport('qb-inventory', 'GetItemByName', id, item);
                 n = entry && entry.amount;
             }
             return Number(n) || 0;
@@ -96,11 +96,11 @@ AGM.inv.remove = function (src, item, count = 1) {
 
     switch (AGM.inv.backend) {
         case 'ox': {
-            const ok = tryExport('ox_inventory', 'RemoveItem', id, item, n);
+            const ok = ag_mechanic_inventory_tryExport('ox_inventory', 'RemoveItem', id, item, n);
             return ok !== false && ok !== undefined;
         }
         case 'qb': {
-            const ok = tryExport('qb-inventory', 'RemoveItem', id, item, n, false, 'ag_mechanic');
+            const ok = ag_mechanic_inventory_tryExport('qb-inventory', 'RemoveItem', id, item, n, false, 'ag_mechanic');
             if (ok !== undefined) return ok !== false;
             const p = AGM.core.getPlayer(id);
             const raw = p && p._raw;
@@ -130,11 +130,11 @@ AGM.inv.add = function (src, item, count = 1, metadata) {
 
     switch (AGM.inv.backend) {
         case 'ox': {
-            const ok = tryExport('ox_inventory', 'AddItem', id, item, n, metadata);
+            const ok = ag_mechanic_inventory_tryExport('ox_inventory', 'AddItem', id, item, n, metadata);
             return ok !== false && ok !== undefined;
         }
         case 'qb': {
-            const ok = tryExport('qb-inventory', 'AddItem', id, item, n, false, metadata, 'ag_mechanic');
+            const ok = ag_mechanic_inventory_tryExport('qb-inventory', 'AddItem', id, item, n, false, metadata, 'ag_mechanic');
             if (ok !== undefined) return ok !== false;
             const p = AGM.core.getPlayer(id);
             const raw = p && p._raw;
@@ -176,11 +176,11 @@ AGM.inv.registerStash = function (shop) {
     if (!stash) return;
 
     if (AGM.inv.stashBackend === 'ox') {
-        tryExport('ox_inventory', 'RegisterStash', stash.id, stash.label, stash.slots, stash.weight, false, {
+        ag_mechanic_inventory_tryExport('ox_inventory', 'RegisterStash', stash.id, stash.label, stash.slots, stash.weight, false, {
             [AGM.Config.job.name]: 0,
         });
     } else if (AGM.inv.stashBackend === 'qb') {
-        tryExport('qb-inventory', 'CreateInventory', stash.id, {
+        ag_mechanic_inventory_tryExport('qb-inventory', 'CreateInventory', stash.id, {
             label: stash.label,
             maxweight: stash.weight,
             slots: stash.slots,
@@ -195,13 +195,13 @@ AGM.inv.openStash = function (src, shop) {
     if (!stash) return false;
 
     if (AGM.inv.stashBackend === 'ox') {
-        const ok = tryExport('ox_inventory', 'forceOpenInventory', Number(src), 'stash', stash.id);
+        const ok = ag_mechanic_inventory_tryExport('ox_inventory', 'forceOpenInventory', Number(src), 'stash', stash.id);
         if (ok !== undefined) return true;
         emitNet('ag_mechanic:client:openStash', Number(src), stash.id);
         return true;
     }
     if (AGM.inv.stashBackend === 'qb') {
-        const ok = tryExport('qb-inventory', 'OpenInventory', Number(src), stash.id, {
+        const ok = ag_mechanic_inventory_tryExport('qb-inventory', 'OpenInventory', Number(src), stash.id, {
             label: stash.label, maxweight: stash.weight, slots: stash.slots,
         });
         if (ok !== undefined) return true;
@@ -221,16 +221,16 @@ AGM.inv.stashContents = async function (shop) {
     if (!stash) return [];
 
     if (AGM.inv.stashBackend === 'ox') {
-        let items = tryExport('ox_inventory', 'GetInventoryItems', stash.id);
+        let items = ag_mechanic_inventory_tryExport('ox_inventory', 'GetInventoryItems', stash.id);
         if (!items) {
-            const inv = tryExport('ox_inventory', 'GetInventory', stash.id);
+            const inv = ag_mechanic_inventory_tryExport('ox_inventory', 'GetInventory', stash.id);
             items = inv && inv.items;
         }
         return normaliseStashList(items);
     }
 
     if (AGM.inv.stashBackend === 'qb') {
-        const inv = tryExport('qb-inventory', 'GetInventory', stash.id);
+        const inv = ag_mechanic_inventory_tryExport('qb-inventory', 'GetInventory', stash.id);
         return normaliseStashList(inv && (inv.items || inv));
     }
 
@@ -269,11 +269,11 @@ AGM.inv.stashAdd = async function (shop, item, count) {
     if (!stash) return false;
 
     if (AGM.inv.stashBackend === 'ox') {
-        const ok = tryExport('ox_inventory', 'AddItem', stash.id, item, n);
+        const ok = ag_mechanic_inventory_tryExport('ox_inventory', 'AddItem', stash.id, item, n);
         return ok !== false && ok !== undefined;
     }
     if (AGM.inv.stashBackend === 'qb') {
-        const ok = tryExport('qb-inventory', 'AddItem', stash.id, item, n, false, null, 'ag_mechanic');
+        const ok = ag_mechanic_inventory_tryExport('qb-inventory', 'AddItem', stash.id, item, n, false, null, 'ag_mechanic');
         return ok !== undefined && ok !== false;
     }
 
@@ -292,11 +292,11 @@ AGM.inv.stashRemove = async function (shop, item, count) {
     if (!stash) return false;
 
     if (AGM.inv.stashBackend === 'ox') {
-        const ok = tryExport('ox_inventory', 'RemoveItem', stash.id, item, n);
+        const ok = ag_mechanic_inventory_tryExport('ox_inventory', 'RemoveItem', stash.id, item, n);
         return ok !== false && ok !== undefined;
     }
     if (AGM.inv.stashBackend === 'qb') {
-        const ok = tryExport('qb-inventory', 'RemoveItem', stash.id, item, n, false, 'ag_mechanic');
+        const ok = ag_mechanic_inventory_tryExport('qb-inventory', 'RemoveItem', stash.id, item, n, false, 'ag_mechanic');
         return ok !== undefined && ok !== false;
     }
 
@@ -310,7 +310,7 @@ AGM.inv.stashRemove = async function (shop, item, count) {
 /** Best available human label for an item name. */
 AGM.inv.itemLabel = function (item) {
     if (AGM.inv.backend === 'ox') {
-        const items = tryExport('ox_inventory', 'Items');
+        const items = ag_mechanic_inventory_tryExport('ox_inventory', 'Items');
         if (items && items[item] && items[item].label) return items[item].label;
     }
     return AGM.Shop.label(item);

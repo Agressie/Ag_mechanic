@@ -11,7 +11,7 @@ AGM.society = {};
 
 const ag_mechanic_society_started = (res) => GetResourceState(res) === 'started';
 
-function tryExport(resource, name, ...args) {
+function ag_mechanic_society_tryExport(resource, name, ...args) {
     try {
         /* `global.exports` because server scripts are CommonJS modules, where the
            bare `exports` identifier is module.exports. */
@@ -54,19 +54,19 @@ AGM.society.canDeposit = function (account) {
 AGM.society.balance = function (account) {
     switch (AGM.society.backend) {
         case 'renewed': {
-            const n = tryExport('Renewed-Banking', 'getAccountMoney', account);
+            const n = ag_mechanic_society_tryExport('Renewed-Banking', 'getAccountMoney', account);
             return Number(n) || 0;
         }
         case 'fd': {
-            const n = tryExport('fd_banking', 'GetAccount', account);
+            const n = ag_mechanic_society_tryExport('fd_banking', 'GetAccount', account);
             return Number(n && n.amount !== undefined ? n.amount : n) || 0;
         }
         case 'qbx_management': {
-            const n = tryExport('qbx_management', 'GetAccountBalance', 'job', account);
+            const n = ag_mechanic_society_tryExport('qbx_management', 'GetAccountBalance', 'job', account);
             return Number(n) || 0;
         }
         case 'qb_management': {
-            const n = tryExport('qb-management', 'GetAccount', account);
+            const n = ag_mechanic_society_tryExport('qb-management', 'GetAccount', account);
             return Number(n) || 0;
         }
         default:
@@ -96,22 +96,22 @@ AGM.society.charge = function (src, amount, reason) {
 
     switch (AGM.society.backend) {
         case 'renewed': {
-            const ok = tryExport('Renewed-Banking', 'removeAccountMoney', account, amt);
+            const ok = ag_mechanic_society_tryExport('Renewed-Banking', 'removeAccountMoney', account, amt);
             if (ok !== undefined && ok !== false) return { ok: true, paidFrom: 'society' };
             break;
         }
         case 'fd': {
-            const ok = tryExport('fd_banking', 'RemoveMoney', account, amt, reason);
+            const ok = ag_mechanic_society_tryExport('fd_banking', 'RemoveMoney', account, amt, reason);
             if (ok !== undefined && ok !== false) return { ok: true, paidFrom: 'society' };
             break;
         }
         case 'qbx_management': {
-            const ok = tryExport('qbx_management', 'RemoveAccountBalance', 'job', account, amt);
+            const ok = ag_mechanic_society_tryExport('qbx_management', 'RemoveAccountBalance', 'job', account, amt);
             if (ok !== undefined && ok !== false) return { ok: true, paidFrom: 'society' };
             break;
         }
         case 'qb_management': {
-            const ok = tryExport('qb-management', 'RemoveMoney', account, amt);
+            const ok = ag_mechanic_society_tryExport('qb-management', 'RemoveMoney', account, amt);
             if (ok !== undefined && ok !== false) return { ok: true, paidFrom: 'society' };
             break;
         }
@@ -133,13 +133,13 @@ AGM.society.deposit = function (amount, reason) {
 
     switch (AGM.society.backend) {
         case 'renewed':
-            return tryExport('Renewed-Banking', 'addAccountMoney', account, amt) !== undefined;
+            return ag_mechanic_society_tryExport('Renewed-Banking', 'addAccountMoney', account, amt) !== undefined;
         case 'fd':
-            return tryExport('fd_banking', 'AddMoney', account, amt, reason) !== undefined;
+            return ag_mechanic_society_tryExport('fd_banking', 'AddMoney', account, amt, reason) !== undefined;
         case 'qbx_management':
-            return tryExport('qbx_management', 'AddAccountBalance', 'job', account, amt) !== undefined;
+            return ag_mechanic_society_tryExport('qbx_management', 'AddAccountBalance', 'job', account, amt) !== undefined;
         case 'qb_management':
-            return tryExport('qb-management', 'AddMoney', account, amt) !== undefined;
+            return ag_mechanic_society_tryExport('qb-management', 'AddMoney', account, amt) !== undefined;
         default:
             return false;
     }

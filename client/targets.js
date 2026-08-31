@@ -12,7 +12,7 @@
 
 AGM.targets = {};
 
-function oxTarget(fn, ...args) {
+function ag_mechanic_targets_oxTarget(fn, ...args) {
     try {
         if (!exports.ox_target || typeof exports.ox_target[fn] !== 'function') {
             AGM.log.error(`ox_target.${fn} is unavailable - is ox_target started?`);
@@ -33,7 +33,7 @@ const JOB_GROUP = { [AGM.Config.job.name]: 0 };
  * vector type to give it. Option tables carry no coordinates, so global-vehicle
  * options are registered from JS directly.
  */
-function addSphereZone(data) {
+function ag_mechanic_targets_addSphereZone(data) {
     emit('ag_mechanic:lua:addSphereZone', JSON.stringify(data));
 }
 
@@ -42,7 +42,7 @@ const blips = [];
 /* --------------------------------------------------------------- vehicle menu */
 
 AGM.targets.registerVehicles = function () {
-    oxTarget('addGlobalVehicle', [
+    ag_mechanic_targets_oxTarget('addGlobalVehicle', [
         {
             name: 'ag_mechanic_diagnose',
             label: 'Inspect the vehicle by hand',
@@ -110,7 +110,7 @@ AGM.targets.registerShops = function () {
     const shop = AGM.Locations.shop;
 
     for (const lift of shop.lifts || []) {
-        addSphereZone({
+        ag_mechanic_targets_addSphereZone({
             coords: lift.coords,
             radius: lift.radius || 5.0,
             debug: AGM.Config.debug,
@@ -126,7 +126,7 @@ AGM.targets.registerShops = function () {
     }
 
     if (shop.stash && shop.stash.point) {
-        addSphereZone({
+        ag_mechanic_targets_addSphereZone({
             coords: shop.stash.point.coords,
             radius: shop.stash.point.radius || 1.4,
             debug: AGM.Config.debug,
@@ -149,7 +149,7 @@ AGM.targets.registerShops = function () {
     }
 
     if (shop.duty) {
-        addSphereZone({
+        ag_mechanic_targets_addSphereZone({
             coords: shop.duty.coords,
             radius: shop.duty.radius || 1.2,
             debug: AGM.Config.debug,
@@ -188,7 +188,7 @@ AGM.targets.remove = function () {
     emit('ag_mechanic:lua:removeZones');
     for (const blip of blips) RemoveBlip(blip);
     blips.length = 0;
-    oxTarget('removeGlobalVehicle', [
+    ag_mechanic_targets_oxTarget('removeGlobalVehicle', [
         'ag_mechanic_diagnose', 'ag_mechanic_scan', 'ag_mechanic_report',
         'ag_mechanic_field', 'ag_mechanic_triage', 'ag_mechanic_service',
         'ag_mechanic_upgrades',

@@ -96,7 +96,7 @@ AGM.scanner.run = async function (vehicle) {
                     'error',
                 );
             } else {
-                AGM.ui.notify(AGM.diagnose.reasonText(reason), 'error');
+                AGM.ui.notify(AGM.ui.reasonText(reason), 'error');
             }
             return null;
         }
