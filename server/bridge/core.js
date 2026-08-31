@@ -15,7 +15,7 @@ AGM.core = {};
 const CORE = 'qbx_core';
 
 /** Calls an export, returning undefined instead of throwing. */
-function tryExport(resource, name, ...args) {
+function ag_mechanic_core_tryExport(resource, name, ...args) {
     try {
         /* `global.exports` because server scripts are CommonJS modules, where the
            bare `exports` identifier is module.exports. */
@@ -37,12 +37,12 @@ AGM.core.available = function () {
 
 /** Raw qbx player object, or null. */
 function rawPlayer(src) {
-    return tryExport(CORE, 'GetPlayer', Number(src)) || null;
+    return ag_mechanic_core_tryExport(CORE, 'GetPlayer', Number(src)) || null;
 }
 
 function rawPlayerByCid(citizenid) {
-    return tryExport(CORE, 'GetPlayerByCitizenId', String(citizenid))
-        || tryExport(CORE, 'GetOfflinePlayer', String(citizenid))
+    return ag_mechanic_core_tryExport(CORE, 'GetPlayerByCitizenId', String(citizenid))
+        || ag_mechanic_core_tryExport(CORE, 'GetOfflinePlayer', String(citizenid))
         || null;
 }
 
@@ -122,9 +122,9 @@ AGM.core.setJob = function (citizenid, jobName, grade) {
     const cid = String(citizenid);
     const level = Number(grade) || 0;
 
-    let ok = tryExport(CORE, 'AddPlayerToJob', cid, jobName, level);
+    let ok = ag_mechanic_core_tryExport(CORE, 'AddPlayerToJob', cid, jobName, level);
     if (ok !== undefined && ok !== false) {
-        tryExport(CORE, 'SetPlayerPrimaryJob', cid, jobName);
+        ag_mechanic_core_tryExport(CORE, 'SetPlayerPrimaryJob', cid, jobName);
         return true;
     }
 
@@ -139,7 +139,7 @@ AGM.core.setJob = function (citizenid, jobName, grade) {
         }
     }
 
-    ok = tryExport(CORE, 'SetJob', cid, jobName, level);
+    ok = ag_mechanic_core_tryExport(CORE, 'SetJob', cid, jobName, level);
     return ok !== undefined && ok !== false;
 };
 
@@ -147,7 +147,7 @@ AGM.core.setJob = function (citizenid, jobName, grade) {
 AGM.core.removeJob = function (citizenid, jobName) {
     const cid = String(citizenid);
 
-    let ok = tryExport(CORE, 'RemovePlayerFromJob', cid, jobName);
+    let ok = ag_mechanic_core_tryExport(CORE, 'RemovePlayerFromJob', cid, jobName);
     if (ok !== undefined && ok !== false) return true;
 
     /* Single-job frameworks: put them back on unemployed. */
@@ -171,7 +171,7 @@ AGM.core.jobMembers = function (jobName) {
     const seen = new Map();
 
     /* Qbox keeps a group index; use it when present. */
-    const members = tryExport(CORE, 'GetGroupMembers', jobName, 'job');
+    const members = ag_mechanic_core_tryExport(CORE, 'GetGroupMembers', jobName, 'job');
     if (Array.isArray(members)) {
         for (const cid of members) {
             const p = AGM.core.getPlayerByCitizenId(cid);
@@ -202,7 +202,7 @@ AGM.core.removeMoney = function (src, account, amount, reason) {
             AGM.log.error('RemoveMoney failed:', err && err.message);
         }
     }
-    const ok = tryExport(CORE, 'RemoveMoney', Number(src), account, amt, reason || 'ag_mechanic');
+    const ok = ag_mechanic_core_tryExport(CORE, 'RemoveMoney', Number(src), account, amt, reason || 'ag_mechanic');
     return ok !== undefined && ok !== false;
 };
 
@@ -219,7 +219,7 @@ AGM.core.addMoney = function (src, account, amount, reason) {
             AGM.log.error('AddMoney failed:', err && err.message);
         }
     }
-    const ok = tryExport(CORE, 'AddMoney', Number(src), account, amt, reason || 'ag_mechanic');
+    const ok = ag_mechanic_core_tryExport(CORE, 'AddMoney', Number(src), account, amt, reason || 'ag_mechanic');
     return ok !== undefined && ok !== false;
 };
 

@@ -233,10 +233,15 @@ if (AGM.Config.payment.minAmount > AGM.Config.payment.maxAmount) bad('payment.mi
 
 /*
  * FiveM evaluates every file in a resource into one shared global scope, per
- * runtime. Two files declaring the same top-level `const`/`let`/`class` is a
- * SyntaxError that silently kills whichever loads second - and the first sign
- * of it is a missing AGM.something at boot, a long way from the cause.
- * (`function` and `var` may legally be redeclared, so they are not flagged.)
+ * runtime. Two files declaring the same top-level name break in two different
+ * ways, and both are flagged here:
+ *
+ *   const/let/class - a SyntaxError that silently kills whichever file loads
+ *     second, first visible as a missing AGM.something at boot.
+ *   function/var - perfectly legal, and worse for it: the last file loaded
+ *     wins and every earlier file silently calls the wrong implementation.
+ *     Two files each with their own `loadModel` do not error, they just quietly
+ *     stop using their own.
  *
  * The convention that keeps this from happening: name anything at the top level
  * of a file `ag_mechanic_<file>_<thing>`, so it cannot clash with another file.
@@ -250,7 +255,7 @@ step('no top-level name collisions between files');
   };
 
   const shared = listOf('shared_scripts');
-  const decl = /^(?:async\s+)?(const|let|class)\s+([A-Za-z_$][\w$]*)/gm;
+  const decl = /^(?:async\s+)?(const|let|class|function|var)\s+([A-Za-z_$][\w$]*)/gm;
 
   for (const [runtime, files] of [
     ['server', shared.concat(listOf('server_scripts'))],
@@ -269,7 +274,10 @@ step('no top-level name collisions between files');
         const name = m[2];
         const previous = seen.get(name);
         if (previous && previous !== file) {
-          bad(`${runtime}: '${name}' is declared at the top level of both ${previous} and ${file}`);
+          const how = m[1] === 'function' || m[1] === 'var'
+            ? `whichever loads last wins, so one of them is calling the other's ${m[1]}`
+            : 'a SyntaxError that kills whichever loads second';
+          bad(`${runtime}: '${name}' is declared at the top level of both ${previous} and ${file} - ${how}`);
         } else {
           seen.set(name, file);
         }

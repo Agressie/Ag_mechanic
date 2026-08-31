@@ -32,7 +32,7 @@ let scene = null;
  * for an off-screen spawn until we request it - and fall back to the config
  * if it still will not answer.
  */
-async function groundAt(coords) {
+async function ag_mechanic_delivery_groundAt(coords) {
     const [x, y, z] = coords;
     RequestCollisionAtCoord(x, y, z);
     for (let i = 0; i < 30; i += 1) {
@@ -45,7 +45,7 @@ async function groundAt(coords) {
     return [x, y, z];
 }
 
-async function loadModel(model) {
+async function ag_mechanic_delivery_loadModel(model) {
     const hash = typeof model === 'string' ? GetHashKey(model) : model;
     if (!IsModelInCdimage(hash) || !IsModelValid(hash)) return null;
 
@@ -57,7 +57,7 @@ async function loadModel(model) {
     return HasModelLoaded(hash) ? hash : null;
 }
 
-async function loadAnim(dict) {
+async function ag_mechanic_delivery_loadAnim(dict) {
     RequestAnimDict(dict);
     const deadline = GetGameTimer() + 5000;
     while (!HasAnimDictLoaded(dict) && GetGameTimer() < deadline) {
@@ -190,7 +190,7 @@ async function restoreVanAsVehicle() {
     if (scene.van && DoesEntityExist(scene.van)) return true; /* was never locked */
     if (!scene.vanModel || !scene.vanCoords) return false;
 
-    const loaded = await loadModel(scene.vanModel);
+    const loaded = await ag_mechanic_delivery_loadModel(scene.vanModel);
     if (!loaded) return false;
 
     const coords = scene.vanCoords;
@@ -242,8 +242,8 @@ function removeSignTarget(driver) {
 async function unload(driver, route, props, anims) {
     phase('unloading');
 
-    const boxHash = await loadModel(props.boxProp);
-    const carryLoaded = await loadAnim(anims.carryBox.dict);
+    const boxHash = await ag_mechanic_delivery_loadModel(props.boxProp);
+    const carryLoaded = await ag_mechanic_delivery_loadAnim(anims.carryBox.dict);
 
     /* Walk round to the back of the van. */
     const van = scene.van;
@@ -288,7 +288,7 @@ async function unload(driver, route, props, anims) {
         scene.box = box;
     }
 
-    if (await loadAnim(anims.putDown.dict)) {
+    if (await ag_mechanic_delivery_loadAnim(anims.putDown.dict)) {
         TaskPlayAnim(driver, anims.putDown.dict, anims.putDown.clip, 8.0, -8.0, 1200, 0, 0, false, false, false);
         await wait(1400);
     }
@@ -310,7 +310,7 @@ async function awaitSignature(driver, route, props, anims) {
     SetEntityHeading(driver, sign.heading || GetEntityHeading(driver));
     FreezeEntityPosition(driver, true);
 
-    const clipHash = await loadModel(props.clipboardProp);
+    const clipHash = await ag_mechanic_delivery_loadModel(props.clipboardProp);
     if (clipHash) {
         const coords = GetEntityCoords(driver, true);
         const clipboard = track(CreateObject(clipHash, coords[0], coords[1], coords[2], true, true, false));
@@ -318,7 +318,7 @@ async function awaitSignature(driver, route, props, anims) {
         scene.clipboard = clipboard;
     }
 
-    if (await loadAnim(anims.clipboard.dict)) {
+    if (await ag_mechanic_delivery_loadAnim(anims.clipboard.dict)) {
         TaskPlayAnim(driver, anims.clipboard.dict, anims.clipboard.clip, 4.0, -4.0, -1, 49, 0, false, false, false);
     }
 
@@ -400,7 +400,7 @@ async function returnToDepot(driver, route, anims) {
         await waitFor(() => AGM.util.dist(GetEntityCoords(driver, true), boxCoords) < 1.8, 10000);
         if (!scene || scene.aborted) return;
 
-        if (await loadAnim(anims.putDown.dict)) {
+        if (await ag_mechanic_delivery_loadAnim(anims.putDown.dict)) {
             TaskPlayAnim(driver, anims.putDown.dict, anims.putDown.clip, 8.0, -8.0, 1200, 0, 0, false, false, false);
             await wait(1200);
         }
@@ -409,7 +409,7 @@ async function returnToDepot(driver, route, anims) {
         SetEntityCollision(scene.box, false, false);
         AttachEntityToEntity(scene.box, driver, GetPedBoneIndex(driver, 60309), 0.05, 0.12, 0.25, 0.0, 0.0, 0.0, false, false, false, false, 2, true);
 
-        if (await loadAnim(anims.carryBox.dict)) {
+        if (await ag_mechanic_delivery_loadAnim(anims.carryBox.dict)) {
             TaskPlayAnim(driver, anims.carryBox.dict, anims.carryBox.clip, 8.0, -8.0, -1, 49, 0, false, false, false);
         }
     }
@@ -486,8 +486,8 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
     const anims = payload.anims;
 
     try {
-        const vanHash = await loadModel(AGM.util.pick(payload.vehicles));
-        const pedHash = await loadModel(AGM.util.pick(payload.driverModels));
+        const vanHash = await ag_mechanic_delivery_loadModel(AGM.util.pick(payload.vehicles));
+        const pedHash = await ag_mechanic_delivery_loadModel(AGM.util.pick(payload.driverModels));
         if (!vanHash || !pedHash) {
             AGM.log.error('delivery models would not load - aborting');
             cleanup(false);
@@ -495,7 +495,7 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
         }
 
         const spawn = route.spawn;
-        const [spawnX, spawnY, spawnZ] = await groundAt(spawn.coords);
+        const [spawnX, spawnY, spawnZ] = await ag_mechanic_delivery_groundAt(spawn.coords);
         const van = track(CreateVehicle(vanHash, spawnX, spawnY, spawnZ, spawn.heading, true, false));
         if (!van || !DoesEntityExist(van)) {
             AGM.log.error('delivery van could not be created at', JSON.stringify(spawn.coords));
@@ -534,6 +534,17 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
         phase('driving');
         for (const point of route.route || []) {
             if (!scene || scene.aborted) return;
+            /* A van that has stopped existing reports its position as [0,0,0],
+               and every waypoint after that burns its full timeout for nothing.
+               Something else deleted it - an entity cleanup script, or OneSync
+               entity lockdown refusing a client-created vehicle - so give up
+               and say why rather than driving a ghost around for two minutes. */
+            if (!DoesEntityExist(van)) {
+                AGM.log.error('the delivery van was deleted by something outside this resource -',
+                    'check sv_entityLockdown and any vehicle cleanup script on your server');
+                cleanup(false);
+                return;
+            }
             TaskVehicleDriveToCoordLongrange(driver, van, point[0], point[1], point[2], payload.approachSpeed + 6, 786603, 10.0);
             const reached = await waitFor(() => AGM.util.dist(GetEntityCoords(van, true), point) < 14.0, 40000);
             if (!reached) {
@@ -604,7 +615,7 @@ onNet('ag_mechanic:client:signDelivery', async () => {
         AGM.ui.notify(
             response && response.reason === 'alreadySigned'
                 ? 'Somebody already signed for this one.'
-                : AGM.diagnose.reasonText(response && response.reason),
+                : AGM.ui.reasonText(response && response.reason),
             'error',
         );
         return;

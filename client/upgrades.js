@@ -23,7 +23,7 @@ AGM.upgrades.open = async function (vehicle) {
 
     const list = await AGM.rpc.call('upgrades:list', AGM.state.args(info));
     if (!list || !list.ok) {
-        AGM.ui.notify(AGM.diagnose.reasonText(list && list.reason), 'error');
+        AGM.ui.notify(AGM.ui.reasonText(list && list.reason), 'error');
         return;
     }
 
@@ -65,7 +65,7 @@ AGM.upgrades.install = async function (info, category, tier, meta = {}) {
             if (reason === 'noItem') {
                 AGM.ui.notify(AGM.util.fmt(AGM.Config.locale.noItem, result.itemLabel || result.item), 'error');
             } else {
-                AGM.ui.notify(AGM.diagnose.reasonText(reason), 'error');
+                AGM.ui.notify(AGM.ui.reasonText(reason), 'error');
             }
             return false;
         }
