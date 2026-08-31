@@ -24,6 +24,27 @@ let scene = null;
 
 /* ------------------------------------------------------------------- helpers */
 
+/*
+ * The configured spawn Z is a guess, and a guess that lands below the road
+ * buries the van: the ped inside still spawns, screams and blocks traffic
+ * while the van itself is invisible under the tarmac. Ask the game where the
+ * ground actually is - collision has to be streamed in first, which it is not
+ * for an off-screen spawn until we request it - and fall back to the config
+ * if it still will not answer.
+ */
+async function groundAt(coords) {
+    const [x, y, z] = coords;
+    RequestCollisionAtCoord(x, y, z);
+    for (let i = 0; i < 30; i += 1) {
+        const [hit, groundZ] = GetGroundZFor_3dCoord(x, y, z + 5.0, false);
+        if (hit) return [x, y, groundZ + 1.0];
+        await wait(50);
+    }
+    AGM.log.warn('no ground found under the delivery spawn', JSON.stringify(coords),
+        '- using the configured height as-is');
+    return [x, y, z];
+}
+
 async function loadModel(model) {
     const hash = typeof model === 'string' ? GetHashKey(model) : model;
     if (!IsModelInCdimage(hash) || !IsModelValid(hash)) return null;
@@ -474,7 +495,8 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
         }
 
         const spawn = route.spawn;
-        const van = track(CreateVehicle(vanHash, spawn.coords[0], spawn.coords[1], spawn.coords[2], spawn.heading, true, false));
+        const [spawnX, spawnY, spawnZ] = await groundAt(spawn.coords);
+        const van = track(CreateVehicle(vanHash, spawnX, spawnY, spawnZ, spawn.heading, true, false));
         if (!van || !DoesEntityExist(van)) {
             AGM.log.error('delivery van could not be created at', JSON.stringify(spawn.coords));
             cleanup(false);

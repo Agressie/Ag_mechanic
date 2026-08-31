@@ -52,8 +52,11 @@ AGM.Locations = {
 
         /* --- parts delivery ---------------------------------------------- */
         delivery: {
-            /* Van spawns here, off-screen down the road. */
-            spawn: { coords: [-283.0, -63.0, 39.0], heading: 250.0 },
+            /* Van spawns here, off-screen down the road. The street climbs
+               away from the shop, so this Z is higher than the forecourt's -
+               spawn code snaps the van to the real ground anyway, but a Z
+               that starts below it buries the van instead. */
+            spawn: { coords: [-283.0, -63.0, 50.0], heading: 250.0 },
             /* Optional waypoints driven in order before the final park. */
             route: [
                 [-300.0, -95.0, 39.0],
