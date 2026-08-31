@@ -11,27 +11,9 @@
 AGM.upgrades = {};
 
 async function resolve(src, args) {
-    const player = AGM.core.getPlayer(src);
-    if (!player) return { error: 'noPlayer' };
-
-    const netId = Number(args.netId);
-    const entity = netId ? NetworkGetEntityFromNetworkId(netId) : 0;
-    if (!entity || !DoesEntityExist(entity)) return { error: 'noVehicle' };
-
-    const ped = GetPlayerPed(String(src));
-    if (AGM.util.dist(GetEntityCoords(ped), GetEntityCoords(entity)) > AGM.Config.security.maxInteractDistance + 3) {
-        return { error: 'tooFar' };
-    }
-
-    const plate = AGM.util.normalisePlate(args.plate || GetVehicleNumberPlateText(entity));
-    const blueprint = AGM.Classes.resolve(Number(args.classId), args.model);
-    if (!AGM.Classes.isSupported(blueprint)) return { error: 'unsupported' };
-
-    const key = AGM.util.vehicleKey(plate, args.vin);
-    const record = await AGM.vehicles.load(key, plate, args.model, blueprint);
-    if (!record) return { error: 'noRecord' };
-
-    return { player, entity, netId, record, key, blueprint, bay: AGM.repair.bayAt(GetEntityCoords(entity)) };
+    const ctx = await AGM.vehicles.resolve(src, args.netId, { maxExtra: 3 });
+    if (ctx.error) return ctx;
+    return { ...ctx, bay: AGM.repair.bayAt(ctx.vehCoords) };
 }
 
 /** Everything fittable to this vehicle, with what is in stock on the mechanic. */
@@ -50,7 +32,6 @@ AGM.rpc.register('upgrades:list', async (src, args) => {
             blurb: tier.blurb,
             item: tier.item,
             itemLabel: tier.item ? AGM.Shop.label(tier.item) : null,
-            labour: tier.labour,
             install: tier.install,
             fitted: index === current,
             /* Tier 0 is removal - it never needs a part. */
@@ -141,14 +122,13 @@ AGM.rpc.register('upgrades:install', async (src, args) => {
         categoryLabel: cat.label,
         tier: index,
         label: tier.label,
-        labour: tier.labour,
         removed: index === 0,
     };
 });
 
 /** Read-only export for other resources that want the fitted tier names. */
-global.exports('getVehicleTiers', (plate, vin) => {
-    const record = AGM.vehicles.peek(AGM.util.vehicleKey(plate, vin));
+global.exports('getVehicleTiers', (plate) => {
+    const record = AGM.vehicles.peek(AGM.util.vehicleKey(plate));
     if (!record) return null;
     const out = {};
     for (const [catId, index] of Object.entries(record.tiers)) {

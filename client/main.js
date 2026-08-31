@@ -15,6 +15,8 @@ async function boot() {
 
     AGM.targets.registerVehicles();
     AGM.targets.registerShops();
+    AGM.payment.registerShop();
+    AGM.payment.registerMobile();
     AGM.monitor.start();
 
     AGM.log.info('client ready');

@@ -4,7 +4,7 @@
      * an upgrade is just fitting tier 0 - which is why tier 0 needs no part.
      */
     import { clientAction, close } from '../lib/nui.js';
-    import { money, perfDelta } from '../lib/format.js';
+    import { perfDelta } from '../lib/format.js';
 
     let { payload = {} } = $props();
 
@@ -87,7 +87,6 @@
                             </div>
 
                             <div class="buy">
-                                {#if tier.labour}<span class="labour dim">Labour {money(tier.labour)}</span>{/if}
                                 <button
                                     class={tier.index === 0 ? '' : 'primary'}
                                     disabled={!!stop}
@@ -104,7 +103,7 @@
         </div>
 
         <footer>
-            <span class="dim small">Parts come out of your own inventory. Labour is what you charge the customer.</span>
+            <span class="dim small">Parts come out of your own inventory. What you charge for the work is between you and the customer.</span>
             <span class="spacer"></span>
             <button class="ghost" onclick={close}>Close</button>
         </footer>
@@ -171,7 +170,6 @@
     .delta.down { color: var(--danger); }
 
     .buy { display: flex; align-items: center; gap: 10px; }
-    .labour { font-size: 11px; }
     .buy button { font-size: 12px; padding: 6px 12px; }
 
     footer { display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }

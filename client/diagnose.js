@@ -12,7 +12,7 @@
 
 AGM.diagnose = {};
 
-let busy = false;
+let ag_mechanic_diagnose_busy = false;
 
 /** Bonnet-equivalent access for the blueprint, or null where there is none. */
 function accessPanel(blueprint) {
@@ -64,7 +64,7 @@ function minigameConfig(blueprint) {
  * backed out or the server refused.
  */
 AGM.diagnose.run = async function (vehicle) {
-    if (busy) return null;
+    if (ag_mechanic_diagnose_busy) return null;
 
     const info = AGM.state.describe(vehicle);
     if (!info) {
@@ -76,7 +76,7 @@ AGM.diagnose.run = async function (vehicle) {
         return null;
     }
 
-    busy = true;
+    ag_mechanic_diagnose_busy = true;
     const ped = PlayerPedId();
     const panel = accessPanel(info.blueprint);
 
@@ -116,7 +116,7 @@ AGM.diagnose.run = async function (vehicle) {
 
         return response.report;
     } finally {
-        busy = false;
+        ag_mechanic_diagnose_busy = false;
         stopSceneAnim(ped);
         if (panel && panel.door !== null && DoesEntityExist(vehicle)) {
             SetVehicleDoorShut(vehicle, panel.door, false);
@@ -166,7 +166,9 @@ function reasonText(reason) {
         case 'alreadyFine': return 'That part is already as good as it gets.';
         case 'deliveryBusy': return L.deliveryBusy;
         case 'funds': return L.orderFunds;
+        case 'tooFast': return L.tooFast;
         default: return 'That did not work.';
     }
 }
 AGM.diagnose.reasonText = reasonText;
+

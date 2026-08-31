@@ -12,7 +12,7 @@
 
 AGM.repair = {};
 
-let busy = false;
+let ag_mechanic_repair_busy = false;
 
 const ANIMS = {
     engine: { dict: 'mini@repair', clip: 'fixing_a_ped', flag: 49 },
@@ -96,7 +96,7 @@ AGM.repair.applyVisuals = function (vehicle, state, componentId) {
  * Returns true when the part actually moved.
  */
 AGM.repair.perform = async function (info, componentId, mode, meta = {}) {
-    if (busy) return false;
+    if (ag_mechanic_repair_busy) return false;
     if (!info) return false;
 
     const vehicle = info.entity && DoesEntityExist(info.entity)
@@ -114,7 +114,7 @@ AGM.repair.perform = async function (info, componentId, mode, meta = {}) {
         return false;
     }
 
-    busy = true;
+    ag_mechanic_repair_busy = true;
     try {
         /* Make sure the server has the newest wear before it decides anything. */
         AGM.monitor.flushNow();
@@ -160,14 +160,14 @@ AGM.repair.perform = async function (info, componentId, mode, meta = {}) {
         }
         return true;
     } finally {
-        busy = false;
+        ag_mechanic_repair_busy = false;
         ClearPedTasks(PlayerPedId());
     }
 };
 
 /** Everything the mechanic can legally do where they are standing. */
 AGM.repair.fullService = async function (info) {
-    if (busy || !info) return false;
+    if (ag_mechanic_repair_busy || !info) return false;
 
     const vehicle = info.entity && DoesEntityExist(info.entity) ? info.entity : 0;
     if (!vehicle) {
@@ -193,7 +193,7 @@ AGM.repair.fullService = async function (info) {
         return false;
     }
 
-    busy = true;
+    ag_mechanic_repair_busy = true;
     try {
         const completed = await AGM.ui.progress({
             duration: Math.min(90000, AGM.Config.repair.mobileRepairDuration * jobs.length),
@@ -230,7 +230,7 @@ AGM.repair.fullService = async function (info) {
         }
         return true;
     } finally {
-        busy = false;
+        ag_mechanic_repair_busy = false;
         ClearPedTasks(PlayerPedId());
     }
 };
@@ -293,3 +293,4 @@ on('ag_mechanic:internal:nuiAction', async (action, args) => {
         if (vehicle) await AGM.diagnose.showLast(vehicle);
     }
 });
+

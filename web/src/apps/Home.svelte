@@ -11,7 +11,7 @@
 
     async function load() {
         loading = true;
-        data = await rpc('tablet:dashboard', { shop: payload.shop?.id });
+        data = await rpc('tablet:dashboard');
         loading = false;
     }
 

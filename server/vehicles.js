@@ -40,10 +40,22 @@ AGM.vehicles.load = async function (key, plate, model, blueprint) {
 
     const cached = cache.get(key);
     if (cached) {
-        cached.seen = Date.now();
-        /* A vehicle can be re-registered with a new plate after a plate change. */
-        if (plate) cached.plate = AGM.util.normalisePlate(plate);
-        return cached;
+        /*
+         * The blueprint is derived server-side from the vehicle itself, so a
+         * disagreement means this plate now belongs to a different kind of
+         * machine than the cached record describes. Reusing it would hand out
+         * rotor components for a hatchback, so the record is rebuilt instead.
+         */
+        if (cached.blueprint !== blueprint) {
+            AGM.log.warn(`${key} was cached as '${cached.blueprint}' but is a '${blueprint}' - rebuilding`);
+            cache.delete(key);
+            /* Whatever anybody had diagnosed described the old component set. */
+            if (AGM.diagnose) AGM.diagnose.forget(key);
+        } else {
+            cached.seen = Date.now();
+            if (plate) cached.plate = AGM.util.normalisePlate(plate);
+            return cached;
+        }
     }
 
     let row = null;
@@ -56,21 +68,102 @@ AGM.vehicles.load = async function (key, plate, model, blueprint) {
 
     const record = fresh(key, plate, model, blueprint);
 
-    if (row) {
-        /* Trust the stored blueprint if the live one looks wrong (a spawn where
-           the class was not resolved yet), but never mix component sets. */
-        const storedBlueprint = AGM.Classes.isSupported(row.blueprint) ? row.blueprint : blueprint;
-        record.blueprint = storedBlueprint;
-        record.health = AGM.Health.sanitise(storedBlueprint, AGM.db.json(row.health, null));
-        record.tiers = AGM.Health.sanitiseTiers(storedBlueprint, AGM.db.json(row.tiers, null));
+    /* Only reuse a stored row that describes the same kind of machine. A plate
+       moved onto a different vehicle starts a clean record. */
+    if (row && row.blueprint === blueprint) {
+        record.health = AGM.Health.sanitise(blueprint, AGM.db.json(row.health, null));
+        record.tiers = AGM.Health.sanitiseTiers(blueprint, AGM.db.json(row.tiers, null));
         record.symptoms = (AGM.db.json(row.symptoms, []) || []).slice(0, SYMPTOM_LIMIT);
         record.odometer = Number(row.odometer) || 0;
         record.model = row.model || record.model;
         record.dirty = false;
+    } else if (row) {
+        AGM.log.warn(`${key} stored as '${row.blueprint}' but is a '${blueprint}' - starting a fresh record`);
     }
 
     cache.set(key, record);
     return record;
+};
+
+/* ------------------------------------------------------------- identity */
+
+/**
+ * Everything that identifies a vehicle, read from the entity itself.
+ *
+ * This is the whole point: the plate decides which health record gets written
+ * to and the type decides which components it has, so neither may come from
+ * the client. A modified client that lies about its plate would otherwise be
+ * able to repair, wreck or read any vehicle on the server from anywhere.
+ */
+AGM.vehicles.identify = function (entity) {
+    if (!entity || !DoesEntityExist(entity)) return null;
+
+    const plate = AGM.util.normalisePlate(GetVehicleNumberPlateText(entity));
+    if (!plate) return null;
+
+    const model = String(GetEntityModel(entity) || '');
+
+    /*
+     * GetVehicleType is server-side; GetVehicleClass is not. On a build old
+     * enough to lack it there is nothing trustworthy to fall back on, so the
+     * vehicle is treated as unsupported rather than taking the client's word.
+     */
+    let type = '';
+    if (typeof GetVehicleType === 'function') {
+        try {
+            type = GetVehicleType(entity) || '';
+        } catch (_) {
+            type = '';
+        }
+    }
+    if (!type) {
+        AGM.log.warn('GetVehicleType is unavailable on this server build - vehicles cannot be classified');
+        return null;
+    }
+
+    const blueprint = AGM.Classes.fromType(type, model);
+    if (!AGM.Classes.isSupported(blueprint)) return null;
+
+    return { plate, model, blueprint, type, key: AGM.util.vehicleKey(plate) };
+};
+
+/**
+ * Resolves the vehicle a player is acting on, from a network id and nothing
+ * else. Returns { error } or the full context every vehicle RPC needs.
+ *
+ * `opts.maxExtra`   metres of slack on top of Config.security.maxInteractDistance
+ * `opts.stationary` refuse while the vehicle is moving
+ */
+AGM.vehicles.resolve = async function (src, netId, opts = {}) {
+    const player = AGM.core.getPlayer(src);
+    if (!player) return { error: 'noPlayer' };
+
+    const id = Number(netId);
+    const entity = id ? NetworkGetEntityFromNetworkId(id) : 0;
+    if (!entity || !DoesEntityExist(entity)) return { error: 'noVehicle' };
+
+    const ped = GetPlayerPed(String(src));
+    /* No ped means no way to verify where this player is. Fail closed. */
+    if (!ped) return { error: 'noPlayer' };
+
+    const reach = AGM.Config.security.maxInteractDistance + (opts.maxExtra || 0);
+    if (AGM.util.dist(GetEntityCoords(ped), GetEntityCoords(entity)) > reach) {
+        return { error: 'tooFar' };
+    }
+
+    if (opts.stationary && GetEntitySpeed(entity) > 1.0) return { error: 'vehicleMoving' };
+
+    const ident = AGM.vehicles.identify(entity);
+    if (!ident) return { error: 'unsupported' };
+
+    const record = await AGM.vehicles.load(ident.key, ident.plate, ident.model, ident.blueprint);
+    if (!record) return { error: 'noRecord' };
+
+    return {
+        player, entity, netId: id, record,
+        key: ident.key, plate: ident.plate, blueprint: ident.blueprint,
+        vehCoords: GetEntityCoords(entity),
+    };
 };
 
 /** In-memory record only, no database round trip. */
@@ -208,10 +301,33 @@ AGM.vehicles.publicState = function (record) {
     };
 };
 
-/** Pushes state to everyone who might be simulating this vehicle. */
+/**
+ * Pushes state to the players who can actually see this vehicle.
+ *
+ * The client applies degraded handling to anything within 30m, so standing next
+ * to a car is enough to need its condition - but the whole server is not. With
+ * no entity to measure from (the applyVehicleWear export, say) it falls back to
+ * telling everyone, because there is no position to filter on.
+ */
 AGM.vehicles.broadcast = function (record, netId) {
     if (!record) return;
     const state = AGM.vehicles.publicState(record);
     state.netId = netId || null;
-    emitNet('ag_mechanic:client:vehicleState', -1, state);
+
+    const id = Number(netId);
+    const entity = id ? NetworkGetEntityFromNetworkId(id) : 0;
+    if (!entity || !DoesEntityExist(entity)) {
+        emitNet('ag_mechanic:client:vehicleState', -1, state);
+        return;
+    }
+
+    const origin = GetEntityCoords(entity);
+    const radius = AGM.Config.net.stateRadius;
+
+    for (const p of getPlayers()) {
+        const ped = GetPlayerPed(p);
+        if (!ped) continue;
+        if (AGM.util.dist(GetEntityCoords(ped), origin) > radius) continue;
+        emitNet('ag_mechanic:client:vehicleState', Number(p), state);
+    }
 };

@@ -1,7 +1,9 @@
 # Moving the shop
 
-Everything world-positioned lives in `config/locations.js`, in one block per
-shop, so relocating the whole business is a single edit.
+Everything world-positioned lives in one block in `config/locations.js`
+(`AGM.Locations.shop`), so relocating the whole business is a single edit.
+This resource runs one shop - there is no shop selector anywhere in the UI or
+the RPCs, they all just operate on that one block.
 
 The defaults are set up around the Los Santos Customs on Greenwich Pl. If you
 are putting the job somewhere else — a custom MLO, Benny's, an airfield — you
@@ -36,6 +38,7 @@ Paste them as `[x, y, z]` arrays. Headings are single floats in degrees.
     lifts: [ ... ],               // where a mechanic stands to work on the bay
     stash: { ... },               // the shared parts store
     duty: { ... },                // clock on / off point
+    payment: { ... },             // the fixed card machine
     delivery: { ... },            // the parts van's route and marks
 }
 ```
@@ -69,7 +72,7 @@ option finds whatever vehicle is parked in that bay and opens its report.
 
 ```js
 stash: {
-    id: 'ag_mechanic_lamesa',       // must be unique per shop
+    id: 'ag_mechanic_lamesa',       // stash key ox_inventory/qb-inventory use
     label: 'Auto Works Parts Store',
     slots: 250,
     weight: 1000000,                // grams
@@ -79,6 +82,18 @@ stash: {
 
 Changing `id` after the shop has been in use orphans whatever was in the old
 stash — ox_inventory keys its contents on that string.
+
+### payment
+
+```js
+payment: { coords: [-330.2, -121.8, 39.0], heading: 340.0 }
+```
+
+Where the fixed card terminal sits. A decorative, non-networked prop
+(`Config.payment.terminalProp`) is placed here purely for set dressing; the
+actual `ox_target` zone is a sphere at these coords, sized by
+`Config.payment.shopDistance`. Set `payment: false` to run the shop with only
+the mobile `card_reader` item and no fixed terminal at all.
 
 ### delivery
 
@@ -102,12 +117,31 @@ server.
 If the van cannot reach `park` within 45 seconds it unloads wherever it stopped
 rather than giving up, so an imperfect route degrades instead of breaking.
 
-## Multiple shops
+Once parked it taps the horn a couple of times (`AGM.Shop.delivery.honk` in
+`config/shop.js`) so the shop knows it has arrived, then drops the pallet at
+`drop` and produces a clipboard at `sign`. While it is standing there waiting to
+be signed for, the van itself is swapped for a frozen static prop of the same
+model in the same spot — nobody can climb in and drive off with it. It is
+swapped back for a real, driveable van the moment the driver needs to leave; if
+that swap ever fails, the pallet and driver are simply despawned rather than
+leaving a stuck scene behind.
 
-`shops` is an array. Add a second entry with its own `id` and its own stash id
-and the whole system — tablet, orders, deliveries, bays — works per shop. Both
-will answer to the same `job`, so use `Config.job.grades` for who can do what
-rather than trying to separate access by shop.
+Signing is done from a small NUI screen, not a hold-to-confirm animation:
+walk up to the driver, use the `Sign for the delivery` target option, and click
+the signature box. A pencil draws the signature in for you — nobody actually
+signs, the click is the confirmation.
+
+Nobody signs within `AGM.Shop.delivery.signTimeout` (15 minutes by default) and
+the driver gives up: the pallet goes back in the van and it drives back to
+`spawn` instead of `exit`, then despawns with the parts still aboard. The order
+reverts from `dispatched` to `returned` rather than being force-delivered, and
+the tablet's Orders tab shows a **Re-ship** button for it that starts the whole
+run again. `AGM.Shop.delivery.hardTimeout` is a separate, longer safety net that
+tears the whole scenario down regardless if something gets stuck.
+
+Only one delivery van is ever on the road at a time — a second `Check in` /
+`Re-ship` while one is already out is refused with `deliveryBusy` until the
+first one finishes (delivered, returned, or aborted).
 
 ## Blips
 

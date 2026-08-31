@@ -27,6 +27,7 @@ for (const file of [
     'config/classes.js',
     'config/components.js',
     'config/tiers.js',
+    'config/dtc.js',
     'config/damage.js',
     'config/handling.js',
     'config/shop.js',
@@ -114,14 +115,166 @@ for (const bp of Object.keys(AGM.Components.blueprints)) {
   if (!list.some((c) => AGM.Health.repairMethod(c, 100) === 'garage')) bad(`${bp} has no workshop-only work`);
 }
 
+step('dtc -> components');
+{
+    const TOKENS = {
+        cylinder: ['cyl', 'bank'],
+        bank: ['bank'],
+        wheel: ['wheel'],
+        blade: ['n'],
+        wing: ['wing'],
+        fixed: ['bank'],
+    };
+
+    for (const [bp, set] of Object.entries(AGM.Dtc.sets)) {
+        if (!AGM.Components.blueprints[bp]) { bad(`dtc set for unknown blueprint '${bp}'`); continue; }
+        const ids = AGM.Components.ids(bp);
+
+        for (const id of Object.keys(set)) {
+            if (!ids.includes(id)) bad(`dtc: ${bp}.${id} is not a component of ${bp}`);
+        }
+        for (const id of ids) {
+            if (!set[id]) bad(`dtc: ${bp}.${id} has no entry, so it is neither scannable nor documented`);
+        }
+
+        for (const [id, entry] of Object.entries(set)) {
+            if (!ids.includes(id)) continue;
+
+            if (!TOKENS[entry.location]) bad(`dtc: ${bp}.${id} has unknown location kind '${entry.location}'`);
+            if (!entry.where) bad(`dtc: ${bp}.${id} has no 'where' text`);
+            if (entry.module && !AGM.Dtc.modules.some((m) => m.id === entry.module)) {
+                bad(`dtc: ${bp}.${id} reports to unknown module '${entry.module}'`);
+            }
+            if (entry.ecu !== false && !entry.codes.length) {
+                bad(`dtc: ${bp}.${id} is marked visible but has no codes`);
+            }
+
+            /* A placeholder the location kind cannot fill would render as
+               literal "{cyl}" on the scanner. */
+            const allowed = TOKENS[entry.location] || [];
+            const texts = entry.codes.flatMap((c) => [c.code, c.desc]).concat([entry.where]);
+            for (const text of texts) {
+                for (const match of String(text).matchAll(/\{(\w+)\}/g)) {
+                    if (!allowed.includes(match[1])) {
+                        bad(`dtc: ${bp}.${id} uses {${match[1]}} but its location is '${entry.location}'`);
+                    }
+                }
+            }
+
+            for (const code of entry.codes) {
+                if (!(code.at > 0 && code.at <= 100)) bad(`dtc: ${bp}.${id} code ${code.code} has an out-of-range threshold ${code.at}`);
+                if (!['low', 'medium', 'high'].includes(code.severity)) {
+                    bad(`dtc: ${bp}.${id} code ${code.code} has bad severity '${code.severity}'`);
+                }
+            }
+        }
+    }
+}
+
+step('diagnostic devices');
+{
+    const LEXICON_KEYS = ['codes', 'pending', 'systems', 'system', 'code', 'lamp', 'live', 'frame', 'monitors'];
+    const claimed = new Map();
+
+    for (const device of AGM.Dtc.devices) {
+        if (!device.item) bad(`device '${device.id}' has no inventory item`);
+        else if (!AGM.Shop.entry(device.item)) bad(`device '${device.id}' item '${device.item}' is not in the catalogue`);
+
+        if (!device.model) bad(`device '${device.id}' has no model name`);
+        if (!device.protocol) bad(`device '${device.id}' has no protocol string`);
+        if (!device.blueprints.length) bad(`device '${device.id}' covers no vehicle types`);
+
+        for (const key of LEXICON_KEYS) {
+            if (!device.lexicon || !device.lexicon[key]) bad(`device '${device.id}' lexicon is missing '${key}'`);
+        }
+
+        for (const bp of device.blueprints) {
+            if (!AGM.Components.blueprints[bp]) { bad(`device '${device.id}' covers unknown blueprint '${bp}'`); continue; }
+            if (claimed.has(bp)) bad(`blueprint '${bp}' is claimed by both '${claimed.get(bp)}' and '${device.id}'`);
+            claimed.set(bp, device.id);
+        }
+    }
+
+    /* Every supported machine needs exactly one tool that can read it, or the
+       scanner interaction is silently impossible for that class. */
+    for (const bp of Object.keys(AGM.Components.blueprints)) {
+        if (!claimed.has(bp)) bad(`no diagnostic device covers '${bp}'`);
+        if (!AGM.Dtc.deviceFor(bp)) bad(`deviceFor('${bp}') returns nothing`);
+    }
+
+    const items = AGM.Dtc.deviceItems();
+    if (new Set(items).size !== items.length) bad('two devices share the same item');
+}
+
+step('both diagnostic tools matter on every machine');
+for (const bp of Object.keys(AGM.Components.blueprints)) {
+    const visible = AGM.Dtc.visibleComponents(bp);
+    const hidden = AGM.Components.ids(bp).filter((id) => !visible.includes(id));
+    if (!visible.length) bad(`${bp} has nothing the scanner can read`);
+    if (!hidden.length) bad(`${bp} has nothing that needs a hands-on inspection`);
+}
+
 step('locations sanity');
-for (const shop of AGM.Locations.shops) {
+{
+  const shop = AGM.Locations.shop;
   if (!shop.bays || !shop.bays.length) bad(`shop '${shop.id}' has no bays`);
   if (!shop.stash) bad(`shop '${shop.id}' has no stash`);
   if (shop.job !== AGM.Config.job.name) bad(`shop '${shop.id}' job '${shop.job}' != Config.job.name '${AGM.Config.job.name}'`);
   const d = shop.delivery;
   for (const mark of ['spawn', 'park', 'drop', 'sign', 'exit']) {
     if (!d || !d[mark] || !Array.isArray(d[mark].coords)) bad(`shop '${shop.id}' delivery is missing '${mark}'`);
+  }
+  if (shop.payment && !Array.isArray(shop.payment.coords)) bad(`shop '${shop.id}' payment terminal has no coords`);
+}
+
+step('payment');
+if (!AGM.Shop.entry('card_reader')) bad(`'card_reader' item is not in the catalogue`);
+if (AGM.Config.payment.minAmount > AGM.Config.payment.maxAmount) bad('payment.minAmount is greater than payment.maxAmount');
+
+/*
+ * FiveM evaluates every file in a resource into one shared global scope, per
+ * runtime. Two files declaring the same top-level `const`/`let`/`class` is a
+ * SyntaxError that silently kills whichever loads second - and the first sign
+ * of it is a missing AGM.something at boot, a long way from the cause.
+ * (`function` and `var` may legally be redeclared, so they are not flagged.)
+ *
+ * The convention that keeps this from happening: name anything at the top level
+ * of a file `ag_mechanic_<file>_<thing>`, so it cannot clash with another file.
+ */
+step('no top-level name collisions between files');
+{
+  const manifest = fs.readFileSync(path.join(ROOT, 'fxmanifest.lua'), 'utf8');
+  const listOf = (name) => {
+    const m = manifest.match(new RegExp(`${name}\\s*\\{([^}]*)\\}`, 's'));
+    return m ? Array.from(m[1].matchAll(/'([^']+\.js)'/g), (x) => x[1]) : [];
+  };
+
+  const shared = listOf('shared_scripts');
+  const decl = /^(?:async\s+)?(const|let|class)\s+([A-Za-z_$][\w$]*)/gm;
+
+  for (const [runtime, files] of [
+    ['server', shared.concat(listOf('server_scripts'))],
+    ['client', shared.concat(listOf('client_scripts'))],
+  ]) {
+    const seen = new Map();
+    for (const file of files) {
+      let src;
+      try {
+        src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+      } catch (_) {
+        continue;
+      }
+
+      for (const m of src.matchAll(decl)) {
+        const name = m[2];
+        const previous = seen.get(name);
+        if (previous && previous !== file) {
+          bad(`${runtime}: '${name}' is declared at the top level of both ${previous} and ${file}`);
+        } else {
+          seen.set(name, file);
+        }
+      }
+    }
   }
 }
 

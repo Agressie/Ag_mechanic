@@ -81,7 +81,10 @@ function deliverResult(value) {
 
 RegisterNuiCallbackType('close');
 on('__cfx_nui:close', (_data, cb) => {
-    AGM.nui.close(true);
+    /* Not silent: the page waits to be told 'hide' before it clears itself, so
+       closing silently here hands input back to the player while leaving the
+       screen still drawn over the top of it. */
+    AGM.nui.close();
     cb({ ok: true });
 });
 
@@ -107,13 +110,14 @@ on('__cfx_nui:release', (_data, cb) => {
  */
 const ALLOWED_RPC = [
     'tablet:open', 'tablet:dashboard',
-    'personnel:roster', 'personnel:hire', 'personnel:fire', 'personnel:grade', 'personnel:forget',
+    'personnel:roster', 'personnel:hire', 'personnel:fire', 'personnel:grade',
     'shop:catalogue', 'shop:orders', 'shop:order', 'shop:cancel', 'shop:receive',
     'shop:stash', 'shop:stashOpen', 'shop:stashTake', 'shop:stashPut',
     'delivery:status',
     'upgrades:list', 'upgrades:install',
     'repair:field', 'repair:mobile', 'repair:workshop', 'repair:service', 'repair:triage',
     'diagnose:last',
+    'scanner:scan', 'scanner:live', 'scanner:freeze',
 ];
 
 RegisterNuiCallbackType('rpc');

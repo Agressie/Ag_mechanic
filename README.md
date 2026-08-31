@@ -75,8 +75,59 @@ nowhere; a dead main rotor means it does not fly.
 
 ### You cannot fix what you have not found
 
-Interacting with a vehicle offers **Run a diagnostic**. That pops the bonnet and
-starts the minigame:
+Two tools, and they see different halves of the vehicle.
+
+**The scanners** are handheld devices with an LCD and six buttons — you work the
+firmware, not a menu. Anyone can carry one; it is not restricted to the job. They
+read what the control modules know: real fault codes with severities, the system
+that reported each one, the exact sub-location (*which* cylinder, *which*
+corner), and plain-language directions to the part. Also live sensor data, freeze
+frames, readiness monitors, and a system tree you walk with the arrows —
+system → part → fault → detail, with healthy systems still browsable.
+
+There are three, and they are not interchangeable, because a car scan tool cannot
+talk to an aircraft:
+
+| Item | Device | Reads | Bus |
+| --- | --- | --- | --- |
+| `obd_scanner` | AGM-9000 | cars, bikes | OBD-II / CAN |
+| `bite_tester` | AV-4 | helicopters, aircraft | ARINC 429 |
+| `marine_diagnostic` | MD-2 | boats | SAE J1939 |
+
+They are not one device with a filter. Each is drawn after the real instrument
+its trade uses: the AGM-9000 is a consumer code reader — portrait, rubber grips,
+hardwired lead, round D-pad, and the three PASS/PEND/MIL readiness lamps that
+light from the live scan. The AV-4 is a flight-line test set — landscape rugged
+case with hazard-yellow corner bumpers, carry handle, MIL-spec circular
+connectors, and **five soft keys** whose labels sit on the glass above them and
+change with the page. The MD-2 is a sealed marine reader — gasket seam, four
+sealing screws, an IP67 badge, gloved-hand keys, and a black Deutsch 9-pin under
+a weather flap.
+
+Each speaks its own trade language too — stored codes on modules, active faults
+on LRUs, active DTCs on ECUs. Bring the wrong box and it tells you which one you
+wanted. Codes are
+deterministic: the same car always reports the same cylinder, so scanning twice
+tells you the same story. Full details in [`docs/scanner.md`](docs/scanner.md).
+
+```
+P0301                              2/6  STORED
+Cylinder 1 misfire detected
+------------------------------------------------
+SYSTEM   Engine Control Module
+PART     Spark Plugs & Coil Packs
+AT       Cylinder 1, bank 1
+WHERE    Coil pack on cylinder 1, under the
+         ignition cover
+```
+
+There is no clear-codes button. Codes are derived from the vehicle's condition
+rather than stored, so a fault exists exactly as long as the fault does: fit the
+part and its codes stop appearing, fix everything and the lamp goes out by
+itself. No way to make the light go out without doing the work.
+
+**Inspecting by hand** is the minigame, and it finds everything no sensor is
+watching:
 
 1. **Back the bolts off.** Hold `SPACE` to load the breaker bar and release
    inside the torque band. Overshoot and you round the head off; stop short and
@@ -84,15 +135,26 @@ starts the minigame:
 2. **Unplug the sensor lines.** Hold `SHIFT` to press the release tab, then drag
    the connector out at a steady rate. Snatch it and the tab snaps.
 
-How cleanly that goes decides how much of the report you get: exact percentages
-on everything, exact on faults only, banded estimates, or just the obvious
-faults with the rest unreadable. Holding the job and carrying an OBD scanner both
-help. A good report also lists *symptoms* — "Held on the rev limiter ×3" — so a
-mechanic can tell the customer exactly what they have been doing.
+How cleanly that goes decides how much you learn: exact figures on everything,
+exact on faults only, rough estimates, or just the obvious faults. It is also
+the only way to read the vehicle's *history* — "Held on the rev limiter ×3" — so
+a mechanic can tell the customer what they have been doing.
 
-Reports go stale after fifteen minutes, or sooner if the vehicle's condition
-drifts. Repairing something updates the report in place rather than voiding it,
-so a mechanic does not have to crawl back under the car between jobs.
+Neither tool is a substitute for the other. No code will ever set for a worn
+brake pad, a bent driveshaft or tired dampers, because nothing is watching them:
+
+| The scanner finds | Only an inspection finds |
+| --- | --- |
+| engine, gaskets, filter, plugs, oil, cooling, fuel | driveshaft |
+| exhaust, ECU, battery, clutch, gearbox | brake pads and discs |
+| brake lines, steering, wheel-speed sensors, lights | suspension and dampers |
+| rotors, gearboxes, hydraulics, controls, avionics | wheels, body, glass |
+
+Knowledge is tracked **per component**, so the two tools accumulate into one
+report that says which found what. Findings go stale after fifteen minutes, or
+sooner for a part whose condition has drifted — per part, so one thing changing
+does not throw away everything you know about the rest of the car. Repairing
+something refreshes that part rather than voiding the lot.
 
 ### Three ways to fix it — and only sometimes a tow
 
@@ -115,6 +177,28 @@ is a roadside job; a proper shunt is a truck.
 **Can this be fixed here?** is its own interaction, so a driver can find out
 before deciding whether to phone for recovery. Towing itself is deliberately not
 part of this resource.
+
+### Getting paid
+
+Bennys is cashless. No cash handler exists at all — a mechanic keys an amount
+into a card machine and it sits **pending** until the customer taps to pay. No
+PIN, no invoice menu, nobody types a citizen id.
+
+Two machines, same screen:
+
+| | Where | Bill a customer |
+| --- | --- | --- |
+| **Fixed terminal** | on the counter | any on-shift mechanic, `ox_target` |
+| **Mobile reader** | the `card_reader` item | use the item anywhere on the job |
+
+The mechanic keys the total in on a little keypad screen — a real card-machine
+mock-up, not a themed menu — and it goes live. The customer then `ox_target`s
+the terminal (or the reader, held out in the mechanic's hand) and taps to pay:
+a card animates onto a contactless pad, a couple of pulse rings, and an
+**APPROVED** flash. The reader can be carrying more than one active charge at
+once, one per mechanic, so a full bay of roadside jobs doesn't queue behind a
+single machine. Unpaid charges expire on their own after a few minutes rather
+than sitting there forever.
 
 ### The tablet
 
@@ -143,17 +227,26 @@ Nothing arrives on its own. Somebody has to **check the order in** from the shop
 app — and that is what sends the van:
 
 1. A van spawns down the road and drives the route to the shop.
-2. The driver parks, gets out, opens the back and carries a pallet to the
-   forecourt.
-3. They set it down, produce a clipboard, and wait.
-4. An employee walks up and signs for it via ox_target.
-5. The parts go into the stash, the driver gets back in and drives off.
+2. It parks up and taps the horn a couple of times to announce itself.
+3. The driver gets out, opens the back and carries a pallet to the forecourt.
+4. They set it down and produce a clipboard, and the van itself locks down —
+   swapped for an immovable prop so nobody can climb in and take it — while it
+   waits to be signed for.
+5. An employee walks up, uses the ox_target option, and signs on a small
+   on-screen delivery slip. Nobody actually signs anything; click the box and a
+   pencil fills the signature in.
+6. The van unlocks, the parts go into the stash, and the driver gets back in
+   and drives off.
 
-The pallet stays where it was put. If nobody signs within five minutes the parts
-go into the stash anyway — the shop is not going to lose a delivery over
-paperwork — and the driver leaves. If the hosting client disconnects mid-run the
-order is settled rather than left stuck, and a hard timeout tears the whole thing
-down so a van can never end up parked across your door forever.
+The pallet stays where it was put — only once it has actually been signed for.
+Nobody signs within **fifteen minutes** and the driver gives up: the pallet goes
+back in the van and it drives back the way it came, taking the parts with it.
+The order is not force-delivered — it drops back to a **returned** state, and
+the shop app's Orders tab gets a **Re-ship** button to send the van straight
+back out. Only one van is ever on the road at a time, across every shop. If the
+hosting client disconnects mid-run the order is returned rather than left stuck,
+and a hard timeout tears the whole thing down so a van can never end up parked
+across your door forever.
 
 ---
 
@@ -190,13 +283,14 @@ Senior Mechanic, Shop Manager, Owner.
 
 | File | What lives there |
 | --- | --- |
-| `config/config.js` | job, grades and permissions, tablet, repair rules, diagnostics, economy, persistence, anti-abuse, all player-facing text |
+| `config/config.js` | job, grades and permissions, tablet, repair rules, diagnostics, economy, card payments, persistence, anti-abuse, all player-facing text |
 | `config/components.js` | the component health blueprints — the heart of it |
 | `config/tiers.js` | the named upgrade ladders |
+| `config/dtc.js` | fault codes, which system reports them, where each part physically is, and the three diagnostic devices |
 | `config/damage.js` | what each kind of abuse damages, and detection thresholds |
 | `config/handling.js` | how a performance axis maps onto handling fields |
 | `config/shop.js` | catalogue, prices, order and delivery timings |
-| `config/locations.js` | bays, lifts, stash, duty point and the delivery route |
+| `config/locations.js` | bays, lifts, stash, duty point, the card machine and the delivery route |
 | `config/classes.js` | GTA vehicle class → blueprint |
 
 Adding a component is one entry in `config/components.js`. Effect weights are
@@ -228,17 +322,19 @@ npm run dev      # http://localhost:5173/?screen=tablet
 npm run build    # writes ../html
 ```
 
-`?screen=` takes `tablet`, `report`, `upgrades` or `diagnose`, and the dev
-fixtures in `web/src/lib/dev.js` mean every screen renders with plausible
-content in a plain browser.
+`?screen=` takes `tablet`, `report`, `upgrades`, `diagnose` or `scanner`, and
+`?screen=scanner&device=obd|bite|marine` picks which of the three tools to render.
+The dev fixtures in `web/src/lib/dev.js` mean every screen works in a plain
+browser — including canned RPC responses, so the tablet's apps and the scanner's
+live data both tick without the game.
 
 ## Exports and commands
 
 ```lua
 -- server
-exports.ag_mechanic:getVehicleHealth(plate, vin)                  --> { component = 0-100 } | nil
-exports.ag_mechanic:getVehicleTiers(plate, vin)                   --> { category = { index, label } } | nil
-exports.ag_mechanic:applyVehicleWear(plate, vin, source, amount)  --> boolean
+exports.ag_mechanic:getVehicleHealth(plate)                  --> { component = 0-100 } | nil
+exports.ag_mechanic:getVehicleTiers(plate)                   --> { category = { index, label } } | nil
+exports.ag_mechanic:applyVehicleWear(plate, source, amount)  --> boolean
 ```
 
 ```lua
@@ -252,12 +348,33 @@ exports.ag_mechanic:useImprovised()
 `command.agmechanic` ace. `agmechanic_debug` dumps the nearest vehicle's state to
 F8 when `Config.debug` is on.
 
+## Documentation
+
+| | |
+| --- | --- |
+| [`docs/scanner.md`](docs/scanner.md) | the scanner: what it can see, the menu, erasing codes, adding your own |
+| [`docs/items.md`](docs/items.md) | every item, ready to paste into ox_inventory or qb-core |
+| [`docs/locations.md`](docs/locations.md) | moving the shop: bays, lifts, stash, delivery route |
+| [`docs/tuning.md`](docs/tuning.md) | making the damage model harsher or gentler |
+
 ## Notes on the implementation
 
 - **The server is the authority.** Clients detect abuse because they are the only
-  ones who can see RPM, wheel slip and impact direction, but every report is rate
-  limited, clamped per component, checked against the vehicle's blueprint, and
-  distance-checked against the player before it counts.
+  ones who can see RPM, wheel slip and impact direction, but a client can be
+  modified, so nothing it says is taken at face value:
+  - **A vehicle identifies itself.** The only thing a client sends is a network
+    id. The plate — which decides *which* health record is written to — and the
+    vehicle type — which decides which components it has — are both read
+    server-side off the entity. A client cannot name a car it is not looking at.
+  - **Wear is capped three ways**: per source, per component, and in total
+    across one report, all drawn from a single budget so listing every source at
+    once buys nothing. It also floors at `security.minHealthFromWear`, so
+    driving abuse can wreck a part but never kill it outright.
+  - **Only the driver reports.** Re-checked server-side against the driver's
+    seat, not taken on trust from the client that claims it.
+  - **Every RPC is throttled**, with longer per-handler cooldowns on the few
+    calls worth pacing. The loading spinners in the UI are waiting on those, so
+    the wait is real rather than an animation.
 - **No module system on the client.** FiveM's client JS runtime evaluates every
   file into one shared global scope, so everything hangs off a single `AGM`
   namespace with load order declared in `fxmanifest.lua`. The server does the

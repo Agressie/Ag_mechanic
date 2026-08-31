@@ -9,28 +9,28 @@
 AGM.rpc = {};
 
 let nextRequestId = 1;
-const pending = new Map();
+const ag_mechanic_rpc_pending = new Map();
 
 /** Calls a server handler and resolves with its return value (null on error). */
 AGM.rpc.call = function (name, args = {}, timeoutMs = 15000) {
     return new Promise((resolve) => {
         const id = nextRequestId++;
         const timer = setTimeout(() => {
-            if (!pending.has(id)) return;
-            pending.delete(id);
+            if (!ag_mechanic_rpc_pending.has(id)) return;
+            ag_mechanic_rpc_pending.delete(id);
             AGM.log.warn(`rpc '${name}' timed out`);
             resolve(null);
         }, timeoutMs);
 
-        pending.set(id, { resolve, timer });
+        ag_mechanic_rpc_pending.set(id, { resolve, timer });
         emitNet('ag_mechanic:rpc', name, id, args);
     });
 };
 
 onNet('ag_mechanic:rpcResult', (requestId, value) => {
-    const entry = pending.get(requestId);
+    const entry = ag_mechanic_rpc_pending.get(requestId);
     if (!entry) return;
-    pending.delete(requestId);
+    ag_mechanic_rpc_pending.delete(requestId);
     clearTimeout(entry.timer);
     entry.resolve(value);
 });
@@ -126,3 +126,4 @@ AGM.ui.cancelProgress = function () {
 onNet('ag_mechanic:client:notify', (data) => {
     AGM.ui.notify(data.description, data.type, data.title);
 });
+

@@ -22,7 +22,7 @@ async function boot() {
         AGM.log.warn('qbx_core is not started - jobs, money and identity will not work until it is.');
     }
 
-    for (const shop of AGM.Locations.shops) AGM.inv.registerStash(shop);
+    AGM.inv.registerStash(AGM.Locations.shop);
 
     /* Persist changed vehicles, expire caches, advance orders. */
     intervals.push(setInterval(() => {
@@ -44,7 +44,7 @@ async function boot() {
     /* Catch up on any orders that came due while the server was down. */
     setTimeout(() => AGM.shop.tick().catch(() => {}), 5 * 1000);
 
-    AGM.log.info(`ready - ${AGM.Locations.shops.length} shop(s), ${Object.keys(AGM.Components.blueprints).length} vehicle blueprints`);
+    AGM.log.info(`ready - ${Object.keys(AGM.Components.blueprints).length} vehicle blueprints`);
 }
 
 on('onResourceStart', (resource) => {
@@ -56,6 +56,7 @@ on('onResourceStop', (resource) => {
     if (resource !== AGM.RESOURCE) return;
     for (const handle of intervals) clearInterval(handle);
     if (AGM.delivery) AGM.delivery.shutdown();
+    if (AGM.payment) AGM.payment.shutdown();
     /* Best effort: the runtime does not wait for us, but small flushes land. */
     AGM.vehicles.flush().catch(() => {});
 });
@@ -71,7 +72,7 @@ AGM.rpc.register('tablet:open', async (src) => {
     }
 
     const me = AGM.core.getPlayer(src);
-    const shop = AGM.Locations.shopsForJob(AGM.Config.job.name)[0] || AGM.Locations.shops[0];
+    const shop = AGM.Locations.shop;
 
     const gradeDef = AGM.Config.job.grades[me.job.grade] || {};
     const apps = AGM.Config.tablet.apps.filter((app) => me.job.grade >= (app.grade || 0));
@@ -84,7 +85,7 @@ AGM.rpc.register('tablet:open', async (src) => {
             grade: me.job.grade,
             gradeLabel: gradeDef.label || me.job.gradeLabel || '',
         },
-        shop: shop ? { id: shop.id, label: shop.label } : null,
+        shop: { id: shop.id, label: shop.label },
         apps,
         can: {
             hire: !!gradeDef.hire,
@@ -98,10 +99,9 @@ AGM.rpc.register('tablet:open', async (src) => {
 });
 
 /** Home screen figures. Cheap enough to call every time the app opens. */
-AGM.rpc.register('tablet:dashboard', async (src, args) => {
+AGM.rpc.register('tablet:dashboard', async (src) => {
     if (!AGM.core.canOpenTablet(src)) return { ok: false, reason: 'noPermission' };
-    const shop = AGM.Locations.shop(String(args.shop || (AGM.Locations.shops[0] || {}).id));
-    if (!shop) return { ok: false, reason: 'noShop' };
+    const shop = AGM.Locations.shop;
 
     let openOrders = [];
     if (AGM.db.ready) {
@@ -134,7 +134,7 @@ AGM.rpc.register('tablet:dashboard', async (src, args) => {
             slots: shop.stash ? shop.stash.slots : 0,
             lowStock: lowStock(stash),
         },
-        delivery: AGM.delivery.isActive(shop.id) ? AGM.delivery.state(shop.id).phase : null,
+        delivery: AGM.delivery.isBusy() ? AGM.delivery.state().phase : null,
         balance: AGM.society.balance(AGM.Config.economy.society),
     };
 });

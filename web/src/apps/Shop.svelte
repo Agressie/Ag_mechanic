@@ -8,8 +8,6 @@
     import { rpc } from '../lib/nui.js';
     import { money, relative } from '../lib/format.js';
 
-    let { payload = {} } = $props();
-
     let tab = $state('catalogue');
     let catalogue = $state(null);
     let orders = $state(null);
@@ -20,14 +18,13 @@
     let search = $state('');
     let cart = $state({});
     let working = $state(false);
-
-    const shop = $derived(payload.shop?.id);
+    let placing = $state(false);
 
     async function load() {
         loading = true;
         const [c, o] = await Promise.all([
-            rpc('shop:catalogue', { shop }),
-            rpc('shop:orders', { shop }),
+            rpc('shop:catalogue'),
+            rpc('shop:orders'),
         ]);
         if (c && c.ok) catalogue = c;
         if (o && o.ok) orders = o;
@@ -38,7 +35,7 @@
     $effect(() => {
         load();
         const handle = setInterval(async () => {
-            const o = await rpc('shop:orders', { shop });
+            const o = await rpc('shop:orders');
             if (o && o.ok) orders = o;
         }, 20000);
         return () => clearInterval(handle);
@@ -83,26 +80,35 @@
         nobodyAtShop: 'Somebody has to be at the shop to take the delivery.',
         tooLate: 'Too late to cancel that one.',
         noDatabase: 'The order database is unavailable.',
+        tooFast: 'Give the system a second to catch up.',
     };
 
     async function placeOrder() {
         if (!cartLines.length || working) return;
         working = true;
+        placing = true;
         error = '';
         notice = '';
 
-        const result = await rpc('shop:order', { shop, lines: cartLines.map((l) => ({ item: l.item, qty: l.qty })) });
+        /* The order genuinely takes a beat to go through - the server paces this
+           call - so the button shows it working rather than freezing. */
+        const [result] = await Promise.all([
+            rpc('shop:order', { lines: cartLines.map((l) => ({ item: l.item, qty: l.qty })) }),
+            new Promise((resolve) => setTimeout(resolve, 1800)),
+        ]);
+
         if (result && result.ok) {
             cart = {};
-            notice = `Order #${result.order.id} placed. It will be at the depot ${relative(result.order.etaMs)}.`;
-            const o = await rpc('shop:orders', { shop });
+            notice = `Order #${result.order.id} confirmed and placed. It will be at the depot ${relative(result.order.etaMs)}.`;
+            const o = await rpc('shop:orders');
             if (o && o.ok) orders = o;
-            const c = await rpc('shop:catalogue', { shop });
+            const c = await rpc('shop:catalogue');
             if (c && c.ok) catalogue = c;
             tab = 'orders';
         } else {
             error = REASONS[result && result.reason] || 'The order was refused.';
         }
+        placing = false;
         working = false;
     }
 
@@ -114,8 +120,10 @@
 
         const result = await rpc('shop:receive', { order: order.id });
         if (result && result.ok) {
-            notice = 'The van is on its way. Meet it out front and sign for it.';
-            const o = await rpc('shop:orders', { shop });
+            notice = order.status === 'returned'
+                ? 'The van is heading back out. Meet it out front and sign for it this time.'
+                : 'The van is on its way. Meet it out front and sign for it.';
+            const o = await rpc('shop:orders');
             if (o && o.ok) orders = o;
         } else {
             error = REASONS[result && result.reason] || 'Could not send the van out.';
@@ -128,7 +136,7 @@
         const result = await rpc('shop:cancel', { order: order.id });
         if (result && result.ok) {
             notice = `Order #${order.id} cancelled. ${money(result.refund)} back into the account.`;
-            const o = await rpc('shop:orders', { shop });
+            const o = await rpc('shop:orders');
             if (o && o.ok) orders = o;
         } else {
             error = REASONS[result && result.reason] || 'Could not cancel that.';
@@ -220,7 +228,13 @@
                     class="primary order"
                     disabled={!cartLines.length || !catalogue.canOrder || working}
                     onclick={placeOrder}
-                >Place the order</button>
+                >
+                    {#if placing}
+                        <span class="spinner" aria-hidden="true"></span>Placing the order…
+                    {:else}
+                        Place the order
+                    {/if}
+                </button>
 
                 {#if !catalogue.canOrder}
                     <p class="faint small">Your grade cannot place orders.</p>
@@ -254,6 +268,8 @@
                                     <span class="dim small">at the depot</span>
                                 {:else if order.status === 'dispatched'}
                                     <span class="dim small">van en route</span>
+                                {:else if order.status === 'returned'}
+                                    <span class="dim small">not signed for - back at the depot</span>
                                 {/if}
                             </td>
                             <td class="right mono">{money(order.cost)}</td>
@@ -261,6 +277,10 @@
                                 {#if order.status === 'ready'}
                                     <button class="primary" disabled={working || orders.deliveryActive} onclick={() => receive(order)}>
                                         {orders.deliveryActive ? 'Van already out' : 'Check in'}
+                                    </button>
+                                {:else if order.status === 'returned'}
+                                    <button class="primary" disabled={working || orders.deliveryActive} onclick={() => receive(order)}>
+                                        {orders.deliveryActive ? 'Van already out' : 'Re-ship'}
                                     </button>
                                 {:else if order.status === 'pending' && orders.canOrder}
                                     <button class="ghost" disabled={working} onclick={() => cancel(order)}>Cancel</button>
@@ -331,8 +351,20 @@
     .line-total { font-size: 11px; color: var(--text-dim); }
     .cart-total { display: flex; align-items: center; margin: 10px 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; }
     .total { font-size: 16px; font-weight: 600; color: var(--accent); }
-    .order { width: 100%; margin-top: 4px; }
+    .order {
+        width: 100%; margin-top: 4px;
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    }
     .cart p { margin: 8px 0 0; line-height: 1.4; }
+
+    .spinner {
+        width: 13px; height: 13px; flex: none;
+        border: 2px solid rgba(2, 18, 31, 0.28);
+        border-top-color: #02121f;
+        border-radius: 50%;
+        animation: spin 700ms linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th {
@@ -350,6 +382,7 @@
     }
     .status.ready { border-color: var(--warn); color: var(--warn); }
     .status.dispatched { border-color: var(--accent); color: var(--accent); }
+    .status.returned { border-color: var(--danger); color: var(--danger-text); }
     .status.delivered { border-color: var(--ok); color: var(--ok); }
     .status.cancelled { opacity: 0.5; }
 

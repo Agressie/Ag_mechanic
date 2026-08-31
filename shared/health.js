@@ -256,10 +256,18 @@ AGM.Health.overall = function (blueprint, health) {
  * Applies a wear source to a health record, in place, honouring per-component
  * decay rates and the wearOn chains (a dry sump eating an engine).
  * Returns the components that actually moved.
+ *
+ * `opts.floor` stops wear at a health value rather than at zero, and
+ * `opts.maxPerComponent` caps how far any single component may move in one
+ * call. Both are used for client-reported wear, where the numbers cannot be
+ * trusted; server-side callers leave them off and get the full effect.
  */
-AGM.Health.applyWear = function (blueprint, health, sourceId, amount) {
+AGM.Health.applyWear = function (blueprint, health, sourceId, amount, opts = {}) {
     const source = AGM.Damage.sources[sourceId];
     if (!source || !source.blueprints.includes(blueprint) || !(amount > 0)) return {};
+
+    const floor = Number.isFinite(opts.floor) ? AGM.util.clamp(opts.floor, 0, 100) : 0;
+    const maxPerComponent = Number.isFinite(opts.maxPerComponent) ? opts.maxPerComponent : Infinity;
 
     const changed = {};
     for (const comp of AGM.Components.list(blueprint)) {
@@ -278,8 +286,13 @@ AGM.Health.applyWear = function (blueprint, health, sourceId, amount) {
         }
 
         if (wear <= 0) continue;
+        wear = Math.min(wear, maxPerComponent);
+
         const before = Number.isFinite(health[comp.id]) ? health[comp.id] : 100;
-        const after = AGM.util.round(AGM.util.clamp(before - wear, 0, 100), 1);
+        /* Already at or under the floor: this source cannot push it lower. */
+        if (before <= floor) continue;
+
+        const after = AGM.util.round(AGM.util.clamp(before - wear, floor, 100), 1);
         if (after !== before) {
             health[comp.id] = after;
             changed[comp.id] = after;

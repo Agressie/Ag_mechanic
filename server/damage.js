@@ -12,60 +12,77 @@ AGM.damage = {};
 
 const limiter = AGM.util.rateLimiter(AGM.Config.security.wearReportInterval);
 
-/** Resolves and validates the vehicle a client claims to be reporting on. */
-async function resolveVehicle(src, payload) {
-    const netId = Number(payload.netId);
-    if (!netId) return null;
+/*
+ * Who was last at the wheel of what.
+ *
+ * The client flushes one final batch as the player steps out of the vehicle, by
+ * which point they are no longer in the driver's seat - so a strict seat check
+ * would throw away the last few seconds of every drive. This remembers the
+ * driver briefly so that flush still lands, without opening the door to anyone
+ * who simply walked past: you must have actually been driving *that* vehicle,
+ * moments ago, and still be next to it.
+ */
+const GRACE_MS = 20000;
+const lastDriven = new Map();   // src -> { netId, at }
 
-    const entity = NetworkGetEntityFromNetworkId(netId);
-    if (!entity || !DoesEntityExist(entity)) return null;
-
-    /* The reporter must actually be at the vehicle. */
-    const ped = GetPlayerPed(String(src));
-    if (ped) {
-        const a = GetEntityCoords(ped);
-        const b = GetEntityCoords(entity);
-        const dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
-        if (Math.sqrt(dx * dx + dy * dy + dz * dz) > 25.0) {
-            AGM.log.debug(`wear report from ${src} rejected: too far from vehicle`);
-            return null;
-        }
-    }
-
-    const plate = AGM.util.normalisePlate(payload.plate || GetVehicleNumberPlateText(entity));
-    const blueprint = AGM.Classes.resolve(Number(payload.classId), payload.model);
-    if (!AGM.Classes.isSupported(blueprint)) return null;
-
-    const key = AGM.util.vehicleKey(plate, payload.vin);
-    const record = await AGM.vehicles.load(key, plate, payload.model, blueprint);
-    if (!record) return null;
-
-    return { record, entity, netId };
+function wasDriving(src, netId) {
+    const entry = lastDriven.get(src);
+    if (!entry || entry.netId !== netId) return false;
+    return Date.now() - entry.at <= GRACE_MS;
 }
+
+on('playerDropped', () => lastDriven.delete(Number(global.source)));
 
 /**
  * Applies a batch of wear. `payload.wear` is { sourceId: amount } accumulated
  * client-side since the last flush; `payload.distance` is metres travelled.
+ *
+ * Nothing in the payload identifies the vehicle - that is read from the entity
+ * behind the network id, and the reporter has to be (or have just been) at the
+ * wheel of it. All the payload carries is numbers, and those are capped three
+ * ways: per source, per component, and in total across the whole report.
  */
 AGM.damage.intake = async function (src, payload) {
     if (!payload || typeof payload !== 'object') return null;
     if (!limiter(src)) return null;
 
-    const resolved = await resolveVehicle(src, payload);
-    if (!resolved) return null;
-    const { record, netId } = resolved;
+    /* Resolved on proximity, then the seat is checked below - so the grace
+       window above can let the final flush through. */
+    const ctx = await AGM.vehicles.resolve(src, payload.netId, { maxExtra: 14 });
+    if (ctx.error) {
+        AGM.log.debug(`wear report from ${src} rejected: ${ctx.error}`);
+        return null;
+    }
+    const { record, netId } = ctx;
+
+    const driving = GetPedInVehicleSeat(ctx.entity, -1) === GetPlayerPed(String(src));
+    if (driving) {
+        lastDriven.set(src, { netId, at: Date.now() });
+    } else if (!wasDriving(src, netId)) {
+        AGM.log.debug(`wear report from ${src} rejected: not driving ${netId}`);
+        return null;
+    }
 
     const before = { ...record.health };
-    const cap = AGM.Config.security.maxWearPerReport;
+    const sec = AGM.Config.security;
+    const wearOpts = { floor: sec.minHealthFromWear, maxPerComponent: sec.maxWearPerComponent };
+
+    let budget = sec.maxWearTotalPerReport;
     let touched = false;
 
     for (const [sourceId, rawAmount] of Object.entries(payload.wear || {})) {
+        if (budget <= 0) break;
+
         const amount = Number(rawAmount);
         if (!Number.isFinite(amount) || amount <= 0) continue;
         if (!AGM.Damage.applies(sourceId, record.blueprint)) continue;
 
-        const clamped = Math.min(amount, cap);
-        const changed = AGM.Health.applyWear(record.blueprint, record.health, sourceId, clamped);
+        /* Each source is capped, and every source drawn from one shared budget
+           so naming all of them at once buys nothing. */
+        const clamped = Math.min(amount, sec.maxWearPerReport, budget);
+        budget -= clamped;
+
+        const changed = AGM.Health.applyWear(record.blueprint, record.health, sourceId, clamped, wearOpts);
         if (!AGM.util.isEmpty(changed)) {
             AGM.vehicles.noteSymptom(record, sourceId);
             touched = true;
@@ -114,25 +131,29 @@ onNet('ag_mechanic:server:wear', (payload) => {
 
 /**
  * Client asks for a vehicle's authoritative state, normally right after taking
- * over simulation of it.
+ * over simulation of it. Read-only, so being near it is enough.
  */
 AGM.rpc.register('vehicle:state', async (src, args) => {
-    const resolved = await resolveVehicle(src, args || {});
-    if (!resolved) return null;
-    const state = AGM.vehicles.publicState(resolved.record);
-    state.netId = resolved.netId;
+    const ctx = await AGM.vehicles.resolve(src, (args || {}).netId, { maxExtra: 24 });
+    if (ctx.error) return null;
+    const state = AGM.vehicles.publicState(ctx.record);
+    state.netId = ctx.netId;
     return state;
 });
 
 /** Exposed so other resources (a tow script, an admin menu) can read health. */
-global.exports('getVehicleHealth', (plate, vin) => {
-    const record = AGM.vehicles.peek(AGM.util.vehicleKey(plate, vin));
+global.exports('getVehicleHealth', (plate) => {
+    const record = AGM.vehicles.peek(AGM.util.vehicleKey(plate));
     return record ? AGM.util.clone(record.health) : null;
 });
 
-/** Lets another resource apply wear, e.g. a scripted event or a stunt jump. */
-global.exports('applyVehicleWear', (plate, vin, sourceId, amount) => {
-    const record = AGM.vehicles.peek(AGM.util.vehicleKey(plate, vin));
+/**
+ * Lets another resource apply wear, e.g. a scripted event or a stunt jump.
+ * Another resource is trusted code, so this gets the uncapped effect that a
+ * client report does not.
+ */
+global.exports('applyVehicleWear', (plate, sourceId, amount) => {
+    const record = AGM.vehicles.peek(AGM.util.vehicleKey(plate));
     if (!record) return false;
     if (!AGM.Damage.applies(sourceId, record.blueprint)) return false;
     const changed = AGM.Health.applyWear(record.blueprint, record.health, sourceId, Number(amount) || 0);

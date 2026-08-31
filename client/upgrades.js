@@ -8,7 +8,7 @@
 
 AGM.upgrades = {};
 
-let busy = false;
+let ag_mechanic_upgrades_busy = false;
 
 AGM.upgrades.open = async function (vehicle) {
     const info = AGM.state.describe(vehicle);
@@ -31,7 +31,7 @@ AGM.upgrades.open = async function (vehicle) {
 };
 
 AGM.upgrades.install = async function (info, category, tier, meta = {}) {
-    if (busy || !info) return false;
+    if (ag_mechanic_upgrades_busy || !info) return false;
 
     const vehicle = info.entity && DoesEntityExist(info.entity) ? info.entity : 0;
     if (!vehicle) {
@@ -47,7 +47,7 @@ AGM.upgrades.install = async function (info, category, tier, meta = {}) {
         return false;
     }
 
-    busy = true;
+    ag_mechanic_upgrades_busy = true;
     try {
         const heavy = meta.install === 'garage';
         const completed = await AGM.ui.progress({
@@ -76,12 +76,12 @@ AGM.upgrades.install = async function (info, category, tier, meta = {}) {
         AGM.ui.notify(
             result.removed
                 ? `${result.categoryLabel} back to standard.`
-                : `${result.label} fitted.${result.labour ? ` Labour: $${result.labour}.` : ''}`,
+                : `${result.label} fitted.`,
             'success',
         );
         return true;
     } finally {
-        busy = false;
+        ag_mechanic_upgrades_busy = false;
         ClearPedTasks(PlayerPedId());
     }
 };
@@ -101,3 +101,4 @@ on('ag_mechanic:internal:nuiAction', async (action, args) => {
     const vehicle = info.entity && DoesEntityExist(info.entity) ? info.entity : 0;
     if (vehicle) await AGM.upgrades.open(vehicle);
 });
+

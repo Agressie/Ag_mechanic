@@ -58,7 +58,7 @@ function stowTablet() {
 }
 
 /** Opens the tablet on `app`. */
-AGM.tablet.open = async function (app = 'home', shopId) {
+AGM.tablet.open = async function (app = 'home') {
     if (AGM.nui.open) return;
 
     const session = await AGM.rpc.call('tablet:open', {});
@@ -72,7 +72,6 @@ AGM.tablet.open = async function (app = 'home', shopId) {
         return;
     }
 
-    if (shopId && session.shop) session.shop.id = shopId;
     session.startApp = app;
 
     await holdTablet();
@@ -114,10 +113,11 @@ if (AGM.Config.tablet.keybind) {
  */
 exports('useTablet', () => AGM.tablet.open('home'));
 
+/* One export for all three tools - the vehicle decides which is valid. */
 exports('useScanner', () => {
     const vehicle = AGM.state.nearestVehicle(6.0);
     if (!vehicle) return AGM.ui.notify(AGM.Config.locale.noVehicle, 'error');
-    AGM.diagnose.run(vehicle);
+    AGM.scanner.run(vehicle);
 });
 
 exports('useImprovised', () => {

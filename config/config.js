@@ -58,9 +58,17 @@ AGM.Config = {
     },
 
     /* ---------------------------------------------------------- diagnose */
+    /*
+     * Two ways to find a fault, and they see different things.
+     *
+     *   the scanner   reads what the control modules know: engine, fuel,
+     *                 ignition, electrics, ABS, gearbox. Needs the item.
+     *   inspection    everything no sensor is watching: pads, dampers, the
+     *                 driveshaft, panels, glass. Needs the minigame.
+     *
+     * Neither is a substitute for the other, which is the point.
+     */
     diagnose: {
-        /* Anyone can pop the hood and guess; a scanner makes the report exact. */
-        scannerItem: 'obd_scanner',
         duration: 0,               // driven by the minigame, not a timer
         /* How long a report stays "fresh" before the numbers are stale (ms). */
         reportTtl: 15 * 60 * 1000,
@@ -78,7 +86,26 @@ AGM.Config = {
         },
         /* Being on the mechanic job is worth this much added score. */
         jobScoreBonus: 0.08,
-        scannerScoreBonus: 0.12,
+    },
+
+    /* ----------------------------------------------------------- scanner */
+    scanner: {
+        /*
+         * Which tool works on what is decided by the device table in
+         * config/dtc.js - a car scan tool cannot talk to an aircraft. The
+         * matching device must be in the player's inventory: no tool, no scan.
+         */
+        /* Plugging into the port, before the device wakes up. */
+        hookupDuration: 4500,
+        /* A scan's findings stay usable for this long (ms). */
+        linkTtl: 10 * 60 * 1000,
+
+        /* There is no "clear codes" button, and deliberately so: codes are
+           derived from the vehicle's condition, so repairing a part clears its
+           codes by itself and nothing else can. */
+
+        /* Live data refresh interval in the device UI (ms). */
+        liveInterval: 900,
     },
 
     /* ------------------------------------------------------------ garages */
@@ -97,6 +124,33 @@ AGM.Config = {
         priceMultiplier: 1.0,
     },
 
+    /* ----------------------------------------------------------- payment */
+    /*
+     * Bennys is cashless. A mechanic keys an amount into a card machine and it
+     * sits 'pending' until a customer taps to pay - no PIN, no cash, and the
+     * mechanic never touches the customer's money directly.
+     *
+     *   shop     the fixed terminal on the counter, at Locations.shop.payment.
+     *            One charge waiting at a time.
+     *   mobile   the `card_reader` item. Each one a mechanic is holding tracks
+     *            its own charge, so several can be out on jobs at once.
+     */
+    payment: {
+        minAmount: 1,
+        maxAmount: 250000,
+        /* A charge nobody pays expires after this long (ms). */
+        pendingTimeout: 10 * 60 * 1000,
+        /* How close a card has to tap to the machine (m). */
+        shopDistance: 3.0,
+        mobileDistance: 2.5,
+        /* Props. The shop terminal is decorative set dressing - the actual
+           interaction point is Locations.shop.payment, not the prop itself. */
+        terminalProp: 'prop_till_01',
+        mobileProp: 'prop_phone_ing',
+        /* Held out towards the customer while a mobile charge is live. */
+        holdAnim: { dict: 'mp_common', clip: 'givetake1_a' },
+    },
+
     /* -------------------------------------------------------- persistence */
     persistence: {
         /* Save dirty vehicles to the database on this interval (ms). */
@@ -108,13 +162,57 @@ AGM.Config = {
     },
 
     /* -------------------------------------------------------- anti-abuse */
+    /*
+     * The client is the only thing that can see RPM, wheel slip and impacts, so
+     * it has to be the one reporting wear - but a client can be modified, so
+     * nothing it says is taken at face value. The vehicle's identity is read
+     * server-side from the entity, and the numbers are capped here.
+     */
     security: {
-        /* Max wear a single client report may contain, per component. */
+        /* Max wear a single report may contain from any one source. */
         maxWearPerReport: 35,
+        /* Max wear a single report may contain in total, across all sources.
+           Without this a report naming all 23 sources at once could flatten a
+           vehicle in one packet. */
+        maxWearTotalPerReport: 45,
+        /* Max wear a single report may do to any one component. */
+        maxWearPerComponent: 20,
+        /*
+         * Floor for client-reported wear. Driving abuse can take a part down to
+         * here and no further, so a modded client cannot kill anything outright.
+         * 25 leaves a component well below its service threshold - the vehicle
+         * drives badly and needs a workshop - without handing out instant
+         * write-offs. Repairs, and the applyVehicleWear export, ignore this.
+         */
+        minHealthFromWear: 25,
         /* Minimum ms between wear reports from one client. */
         wearReportInterval: 900,
         /* Max distance (m) a player may be from a vehicle to act on it. */
         maxInteractDistance: 6.0,
+        /* Blanket RPC throttle, per player. Generous enough that normal play
+           never touches it; only scripted spam does. */
+        rpcPerSecond: 20,
+        /*
+         * Server-side cooldowns for the handful of calls that are expensive or
+         * worth pacing, in ms. These are what the loading spinners in the UI are
+         * actually waiting on, so the delay is real rather than cosmetic.
+         */
+        cooldowns: {
+            'shop:order': 2500,
+            'scanner:scan': 2000,
+            'diagnose:submit': 2000,
+        },
+    },
+
+    /* ------------------------------------------------------- broadcasting */
+    net: {
+        /*
+         * How close a player has to be to a vehicle to be told its condition
+         * changed. The client applies degraded handling to vehicles within 30m,
+         * so this needs to clear that - but it does not need to be the whole
+         * map, which is what it used to be.
+         */
+        stateRadius: 60.0,
     },
 
     /* ---------------------------------------------------------- messages */
@@ -140,5 +238,15 @@ AGM.Config = {
         deliveryArrived: 'A parts delivery has arrived out front.',
         deliverySigned: 'Delivery signed for. Parts moved to the stash.',
         deliveryBusy: 'A delivery is already on its way.',
+        paymentSet: 'Charge set. Waiting for a card.',
+        paymentCancelled: 'Charge cancelled.',
+        paymentPaid: 'Payment approved.',
+        paymentNoCharge: 'Nothing to pay right now.',
+        paymentBusy: 'There is already a charge waiting on this machine.',
+        paymentTooFar: 'Stand closer to the machine.',
+        paymentFunds: 'The card was declined.',
+        paymentBadAmount: 'That is not a valid amount.',
+        paymentTerminalDown: 'The terminal cannot reach the bank. Nothing has been charged - try again in a bit.',
+        tooFast: 'Give it a second.',
     },
 };

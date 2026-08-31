@@ -34,9 +34,12 @@ AGM.Shop = {
         /* ---- consumables ------------------------------------------------ */
         P('ducttape', 'Duct Tape', 'consumables', 25, { packs: [5, 10, 25], blurb: 'Holds a bumper on. Holds a radiator hose. Briefly.' }),
         P('zipties', 'Cable Ties', 'consumables', 18, { packs: [10, 25, 50], blurb: 'The correct tool for absolutely nothing, used for everything.' }),
-        P('obd_scanner', 'OBD Diagnostic Scanner', 'consumables', 1200, { packs: [1, 2], blurb: 'Turns guesswork into numbers.' }),
+        P('obd_scanner', 'OBD-II Scan Tool', 'consumables', 1200, { packs: [1, 2], blurb: 'Turns guesswork into codes. Cars and bikes only.' }),
+        P('bite_tester', 'Avionics BITE Test Set', 'aircraft', 8600, { packs: [1], blurb: 'Reads built-in-test faults off an airframe. Will not talk to a car.' }),
+        P('marine_diagnostic', 'Marine Diagnostic Tool', 'marine', 2400, { packs: [1], blurb: 'J1939 reader for marine diesels.' }),
         P('mechanic_toolbox', 'Mechanic Toolbox', 'consumables', 900, { packs: [1, 2], blurb: 'Spanners, sockets, and a torque wrench nobody calibrates.' }),
         P('mechanic_tablet', 'Shop Tablet', 'consumables', 2500, { packs: [1, 2], blurb: 'Roster, stash and the parts account, in one greasy screen.' }),
+        P('card_reader', 'Mobile Card Reader', 'consumables', 650, { packs: [1, 2], blurb: 'Tap-to-pay, no wires. Bill a customer wherever the job is.' }),
 
         /* ---- engine ------------------------------------------------------ */
         P('air_filter', 'Air Filter', 'engine', 65, { blurb: 'Cheap, and neglected on every vehicle you will ever see.' }),
@@ -141,15 +144,18 @@ AGM.Shop = {
         /* Prop dropped in front of the shop. */
         boxProp: 'prop_boxpile_07d',
         clipboardProp: 'p_amb_clipboard_01',
-        penProp: 'prop_pencil_01',
         /* How long the driver will wait for a signature before giving up (ms).
-           On timeout the parts still land in the stash - the shop is not going
-           to lose a pallet over paperwork. */
-        signTimeout: 5 * 60 * 1000,
+           If nobody signs in time the pallet goes back in the van and it drives
+           back the way it came - see 'orders' on the tablet for the re-ship
+           button that sends it out again. */
+        signTimeout: 15 * 60 * 1000,
         /* Speed the van drives the last leg at (m/s). */
         approachSpeed: 12.0,
-        /* Cleanup guard: kill the whole scenario after this long regardless. */
-        hardTimeout: 12 * 60 * 1000,
+        /* Cleanup guard: kill the whole scenario after this long regardless,
+           whether that means it never got signed for or the return leg hung. */
+        hardTimeout: 20 * 60 * 1000,
+        /* Horn taps once parked, to let the shop know it has arrived. */
+        honk: { count: 2, onMs: 350, gapMs: 450 },
     },
 };
 

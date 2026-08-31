@@ -16,10 +16,17 @@ function gradeList() {
         .sort((a, b) => a.level - b.level);
 }
 
-/** Roster rows merged from the framework and our own table. */
+/**
+ * The roster.
+ *
+ * The framework is the only source of who holds the job - our own table just
+ * adds the hire metadata (when, by whom) that the core does not record. Rows in
+ * our table for somebody the core no longer knows about are ignored rather than
+ * surfaced: an employee is whoever the framework says is an employee, and that
+ * is the whole rule.
+ */
 AGM.personnel.roster = async function (shopId) {
-    const jobName = AGM.Config.job.name;
-    const members = AGM.core.jobMembers(jobName);
+    const members = AGM.core.jobMembers(AGM.Config.job.name);
 
     let rows = [];
     if (AGM.db.ready) {
@@ -28,11 +35,10 @@ AGM.personnel.roster = async function (shopId) {
             [shopId],
         ).catch(() => []);
     }
-    const extra = new Map((rows || []).map((r) => [r.citizenid, r]));
+    const meta = new Map((rows || []).map((r) => [r.citizenid, r]));
 
     const roster = members.map((m) => {
-        const row = extra.get(m.citizenid);
-        extra.delete(m.citizenid);
+        const row = meta.get(m.citizenid);
         return {
             citizenid: m.citizenid,
             name: m.name,
@@ -45,24 +51,6 @@ AGM.personnel.roster = async function (shopId) {
             note: row ? row.note : '',
         };
     });
-
-    /* Anyone in our table the core no longer knows about: they were fired
-       elsewhere, or the character was deleted. Surface them so a manager can
-       clear the row rather than wondering why the numbers disagree. */
-    for (const row of extra.values()) {
-        roster.push({
-            citizenid: row.citizenid,
-            name: row.name,
-            grade: Number(row.grade) || 0,
-            gradeLabel: (AGM.Config.job.grades[Number(row.grade)] || {}).label || '',
-            online: false,
-            onDuty: false,
-            hiredAt: Number(row.hired_at) || 0,
-            hiredBy: row.hired_by,
-            note: row.note,
-            stale: true,
-        });
-    }
 
     roster.sort((a, b) => (b.grade - a.grade) || a.name.localeCompare(b.name));
     return roster;
@@ -83,7 +71,7 @@ async function upsertRow(shopId, player, grade, hiredBy) {
 AGM.rpc.register('personnel:roster', async (src, args) => {
     if (!AGM.core.canOpenTablet(src)) return { ok: false, reason: 'noPermission' };
     const me = AGM.core.getPlayer(src);
-    const shopId = String(args.shop || (AGM.Locations.shops[0] || {}).id || '');
+    const shopId = AGM.Locations.shop.id;
 
     return {
         ok: true,
@@ -131,7 +119,7 @@ AGM.rpc.register('personnel:hire', async (src, args) => {
     if (!AGM.core.perm(src, 'hire')) return { ok: false, reason: 'noPermission' };
 
     const me = AGM.core.getPlayer(src);
-    const shopId = String(args.shop || (AGM.Locations.shops[0] || {}).id || '');
+    const shopId = AGM.Locations.shop.id;
 
     /* Accept either a nearby player id or a citizen id typed into the tablet. */
     let target = null;
@@ -160,7 +148,7 @@ AGM.rpc.register('personnel:hire', async (src, args) => {
     AGM.db.log(shopId, me.name, 'hire', { target: target.name, citizenid: target.citizenid, grade });
 
     if (target.src) {
-        AGM.core.notify(target.src, `You have been taken on at ${shopLabel(shopId)}.`, 'success');
+        AGM.core.notify(target.src, `You have been taken on at ${shopLabel()}.`, 'success');
     }
     return { ok: true, roster: await AGM.personnel.roster(shopId) };
 });
@@ -169,26 +157,31 @@ AGM.rpc.register('personnel:fire', async (src, args) => {
     if (!AGM.core.perm(src, 'fire')) return { ok: false, reason: 'noPermission' };
 
     const me = AGM.core.getPlayer(src);
-    const shopId = String(args.shop || (AGM.Locations.shops[0] || {}).id || '');
+    const shopId = AGM.Locations.shop.id;
     const citizenid = String(args.citizenid || '');
     if (!citizenid) return { ok: false, reason: 'noTarget' };
     if (citizenid === me.citizenid) return { ok: false, reason: 'notYourself' };
 
+    /*
+     * The target has to be resolvable and actually employed here - the grade
+     * guard below is the whole protection against sacking your own boss, and it
+     * cannot be applied to somebody the framework cannot tell us about.
+     */
     const target = AGM.core.getPlayerByCitizenId(citizenid);
+    if (!target) return { ok: false, reason: 'noTarget' };
+    if (target.job.name !== AGM.Config.job.name) return { ok: false, reason: 'notEmployed' };
+    if (target.job.grade >= me.job.grade) return { ok: false, reason: 'gradeTooHigh' };
 
-    /* You cannot sack someone at or above your own grade. */
-    if (target && target.job.name === AGM.Config.job.name && target.job.grade >= me.job.grade) {
-        return { ok: false, reason: 'gradeTooHigh' };
+    if (!AGM.core.removeJob(citizenid, AGM.Config.job.name)) {
+        return { ok: false, reason: 'coreRefused' };
     }
-
-    if (target) AGM.core.removeJob(citizenid, AGM.Config.job.name);
 
     if (AGM.db.ready) {
         await AGM.db.update('DELETE FROM ag_mechanic_employees WHERE citizenid = ? AND shop = ?', [citizenid, shopId]).catch(() => 0);
     }
-    AGM.db.log(shopId, me.name, 'fire', { citizenid, name: target ? target.name : '' });
+    AGM.db.log(shopId, me.name, 'fire', { citizenid, name: target.name });
 
-    if (target && target.src) AGM.core.notify(target.src, 'You have been let go.', 'error');
+    if (target.src) AGM.core.notify(target.src, 'You have been let go.', 'error');
     return { ok: true, roster: await AGM.personnel.roster(shopId) };
 });
 
@@ -196,7 +189,7 @@ AGM.rpc.register('personnel:grade', async (src, args) => {
     if (!AGM.core.perm(src, 'promote')) return { ok: false, reason: 'noPermission' };
 
     const me = AGM.core.getPlayer(src);
-    const shopId = String(args.shop || (AGM.Locations.shops[0] || {}).id || '');
+    const shopId = AGM.Locations.shop.id;
     const citizenid = String(args.citizenid || '');
     if (!citizenid) return { ok: false, reason: 'noTarget' };
     if (citizenid === me.citizenid) return { ok: false, reason: 'notYourself' };
@@ -225,17 +218,6 @@ AGM.rpc.register('personnel:grade', async (src, args) => {
     return { ok: true, roster: await AGM.personnel.roster(shopId) };
 });
 
-/** Clears a row for someone the core no longer knows about. */
-AGM.rpc.register('personnel:forget', async (src, args) => {
-    if (!AGM.core.perm(src, 'fire')) return { ok: false, reason: 'noPermission' };
-    const shopId = String(args.shop || (AGM.Locations.shops[0] || {}).id || '');
-    const citizenid = String(args.citizenid || '');
-    if (!citizenid || !AGM.db.ready) return { ok: false, reason: 'noTarget' };
-
-    await AGM.db.update('DELETE FROM ag_mechanic_employees WHERE citizenid = ? AND shop = ?', [citizenid, shopId]).catch(() => 0);
-    return { ok: true, roster: await AGM.personnel.roster(shopId) };
-});
-
 /** Highest grade this player may assign to somebody else. */
 function highestAssignable(me) {
     const max = Math.max(...Object.keys(AGM.Config.job.grades).map(Number));
@@ -243,7 +225,6 @@ function highestAssignable(me) {
     return Math.max(0, me.job.grade - 1);
 }
 
-function shopLabel(shopId) {
-    const shop = AGM.Locations.shop(shopId);
-    return shop ? shop.label : 'the workshop';
+function shopLabel() {
+    return AGM.Locations.shop.label;
 }

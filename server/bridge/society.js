@@ -9,7 +9,7 @@
 
 AGM.society = {};
 
-const started = (res) => GetResourceState(res) === 'started';
+const ag_mechanic_society_started = (res) => GetResourceState(res) === 'started';
 
 function tryExport(resource, name, ...args) {
     try {
@@ -28,13 +28,27 @@ function tryExport(resource, name, ...args) {
 AGM.society.backend = 'player';
 
 AGM.society.detect = function () {
-    if (started('Renewed-Banking')) AGM.society.backend = 'renewed';
-    else if (started('fd_banking')) AGM.society.backend = 'fd';
-    else if (started('qbx_management')) AGM.society.backend = 'qbx_management';
-    else if (started('qb-management')) AGM.society.backend = 'qb_management';
+    if (ag_mechanic_society_started('Renewed-Banking')) AGM.society.backend = 'renewed';
+    else if (ag_mechanic_society_started('fd_banking')) AGM.society.backend = 'fd';
+    else if (ag_mechanic_society_started('qbx_management')) AGM.society.backend = 'qbx_management';
+    else if (ag_mechanic_society_started('qb-management')) AGM.society.backend = 'qb_management';
     else AGM.society.backend = 'player';
     AGM.log.info(`society account backend: ${AGM.society.backend}`);
     return AGM.society.backend;
+};
+
+/**
+ * Can this account actually take a deposit right now?
+ *
+ * Worth asking *before* debiting a customer: with no banking resource running
+ * there is nowhere for the money to land, and a deposit that silently fails
+ * after the card has been charged destroys it. Checked by reading the balance
+ * back, which is the one operation every backend supports.
+ */
+AGM.society.canDeposit = function (account) {
+    if (AGM.society.backend === 'player') return false;
+    const balance = AGM.society.balance(account);
+    return Number.isFinite(balance);
 };
 
 AGM.society.balance = function (account) {
@@ -130,3 +144,4 @@ AGM.society.deposit = function (amount, reason) {
             return false;
     }
 };
+
