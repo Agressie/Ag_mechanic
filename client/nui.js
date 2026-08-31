@@ -81,7 +81,10 @@ function deliverResult(value) {
 
 RegisterNuiCallbackType('close');
 on('__cfx_nui:close', (_data, cb) => {
-    AGM.nui.close(true);
+    /* Not silent: the page waits to be told 'hide' before it clears itself, so
+       closing silently here hands input back to the player while leaving the
+       screen still drawn over the top of it. */
+    AGM.nui.close();
     cb({ ok: true });
 });
 

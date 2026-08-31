@@ -11,6 +11,10 @@
  * ============================================================================
  */
 
+/* Own scope: FiveM evaluates every file in a resource into one shared global,
+   so a top-level `const`/`let` here would collide with the same name in another
+   file and kill this one on load with a SyntaxError. */
+(() => {
 AGM.monitor = {};
 
 const D = AGM.Damage.detect;
@@ -369,3 +373,5 @@ AGM.monitor.start = function () {
 
 /** Flushes immediately, e.g. before a repair so the numbers are current. */
 AGM.monitor.flushNow = flush;
+
+})();

@@ -31,6 +31,10 @@
  * ============================================================================
  */
 
+/* Own scope: FiveM evaluates every file in a resource into one shared global,
+   so a top-level `const`/`let` here would collide with the same name in another
+   file and kill this one on load with a SyntaxError. */
+(() => {
 const C = (id, label, group, o = {}) => Object.assign({
     id,
     label,
@@ -541,3 +545,5 @@ AGM.Components.axisTotal = (blueprint, axis) => (AGM.Components._axisTotals[blue
 
 /** Component ids for a blueprint. */
 AGM.Components.ids = (blueprint) => AGM.Components.list(blueprint).map((c) => c.id);
+
+})();

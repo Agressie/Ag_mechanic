@@ -7,6 +7,10 @@
  * ============================================================================
  */
 
+/* Own scope: FiveM evaluates every file in a resource into one shared global,
+   so a top-level `const`/`let` here would collide with the same name in another
+   file and kill this one on load with a SyntaxError. */
+(() => {
 AGM.society = {};
 
 const started = (res) => GetResourceState(res) === 'started';
@@ -144,3 +148,5 @@ AGM.society.deposit = function (amount, reason) {
             return false;
     }
 };
+
+})();

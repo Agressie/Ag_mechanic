@@ -476,6 +476,7 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
         const spawn = route.spawn;
         const van = track(CreateVehicle(vanHash, spawn.coords[0], spawn.coords[1], spawn.coords[2], spawn.heading, true, false));
         if (!van || !DoesEntityExist(van)) {
+            AGM.log.error('delivery van could not be created at', JSON.stringify(spawn.coords));
             cleanup(false);
             return;
         }
@@ -484,7 +485,19 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
         SetEntityAsMissionEntity(van, true, true);
         SetVehicleEngineOn(van, true, true, false);
 
+        /* The vehicle needs a frame to register before a ped can be put in it.
+           Skip this and CreatePedInsideVehicle hands back 0, which is worse than
+           it sounds: every task below silently no-ops, so the van sits at the
+           spawn point with its engine running while each waitFor times out and
+           the phases march on regardless. */
+        await wait(100);
+
         const driver = track(CreatePedInsideVehicle(van, 4, pedHash, -1, true, false));
+        if (!driver || !DoesEntityExist(driver)) {
+            AGM.log.error('delivery driver could not be created - nobody to drive the van');
+            cleanup(false);
+            return;
+        }
         scene.driver = driver;
         SetEntityAsMissionEntity(driver, true, true);
         SetBlockingOfNonTemporaryEvents(driver, true);
@@ -500,7 +513,11 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
         for (const point of route.route || []) {
             if (!scene || scene.aborted) return;
             TaskVehicleDriveToCoordLongrange(driver, van, point[0], point[1], point[2], payload.approachSpeed + 6, 786603, 10.0);
-            await waitFor(() => AGM.util.dist(GetEntityCoords(van, true), point) < 14.0, 40000);
+            const reached = await waitFor(() => AGM.util.dist(GetEntityCoords(van, true), point) < 14.0, 40000);
+            if (!reached) {
+                AGM.log.warn('delivery van never reached waypoint', JSON.stringify(point),
+                    '- check it is on a road node. Van is at', JSON.stringify(GetEntityCoords(van, true)));
+            }
         }
 
         if (!scene || scene.aborted) return;
@@ -510,7 +527,10 @@ onNet('ag_mechanic:client:deliveryStart', async (payload) => {
         const parked = await waitFor(() => AGM.util.dist(GetEntityCoords(van, true), park.coords) < 6.0, 45000);
 
         if (!scene || scene.aborted) return;
-        if (!parked) AGM.log.debug('delivery van could not reach the parking mark - unloading where it stopped');
+        if (!parked) {
+            AGM.log.warn('delivery van could not reach the parking mark - unloading where it stopped.',
+                'Van is at', JSON.stringify(GetEntityCoords(van, true)));
+        }
 
         TaskVehicleTempAction(driver, van, 27, 2000);
         await wait(1200);

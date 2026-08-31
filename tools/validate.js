@@ -231,6 +231,52 @@ step('payment');
 if (!AGM.Shop.entry('card_reader')) bad(`'card_reader' item is not in the catalogue`);
 if (AGM.Config.payment.minAmount > AGM.Config.payment.maxAmount) bad('payment.minAmount is greater than payment.maxAmount');
 
+/*
+ * FiveM evaluates every file in a resource into one shared global scope, per
+ * runtime. Two files declaring the same top-level `const`/`let`/`class` is a
+ * SyntaxError that silently kills whichever loads second - and the first sign
+ * of it is a missing AGM.something at boot, a long way from the cause.
+ * (`function` and `var` may legally be redeclared, so they are not flagged.)
+ */
+step('no top-level name collisions between files');
+{
+  const manifest = fs.readFileSync(path.join(ROOT, 'fxmanifest.lua'), 'utf8');
+  const listOf = (name) => {
+    const m = manifest.match(new RegExp(`${name}\\s*\\{([^}]*)\\}`, 's'));
+    return m ? Array.from(m[1].matchAll(/'([^']+\.js)'/g), (x) => x[1]) : [];
+  };
+
+  const shared = listOf('shared_scripts');
+  const decl = /^(?:async\s+)?(const|let|class)\s+([A-Za-z_$][\w$]*)/gm;
+
+  for (const [runtime, files] of [
+    ['server', shared.concat(listOf('server_scripts'))],
+    ['client', shared.concat(listOf('client_scripts'))],
+  ]) {
+    const seen = new Map();
+    for (const file of files) {
+      let src;
+      try {
+        src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+      } catch (_) {
+        continue;
+      }
+      /* A file wrapped in its own IIFE has no top-level names to clash. */
+      if (/^\s*(?:\/\*[\s\S]*?\*\/\s*)*\(\s*(?:\(\)|function)\s*/.test(src)) continue;
+
+      for (const m of src.matchAll(decl)) {
+        const name = m[2];
+        const previous = seen.get(name);
+        if (previous && previous !== file) {
+          bad(`${runtime}: '${name}' is declared at the top level of both ${previous} and ${file}`);
+        } else {
+          seen.set(name, file);
+        }
+      }
+    }
+  }
+}
+
 step('tablet apps map to grades that exist');
 for (const app of AGM.Config.tablet.apps) {
   if (AGM.Config.job.grades[app.grade] === undefined) bad(`app '${app.id}' needs grade ${app.grade}, which is not defined`);

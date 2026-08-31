@@ -6,6 +6,10 @@
  * ============================================================================
  */
 
+/* Own scope: FiveM evaluates every file in a resource into one shared global,
+   so a top-level `const`/`let` here would collide with the same name in another
+   file and kill this one on load with a SyntaxError. */
+(() => {
 AGM.upgrades = {};
 
 let busy = false;
@@ -101,3 +105,5 @@ on('ag_mechanic:internal:nuiAction', async (action, args) => {
     const vehicle = info.entity && DoesEntityExist(info.entity) ? info.entity : 0;
     if (vehicle) await AGM.upgrades.open(vehicle);
 });
+
+})();

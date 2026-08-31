@@ -34,6 +34,10 @@
  * ============================================================================
  */
 
+/* Own scope: FiveM evaluates every file in a resource into one shared global,
+   so a top-level `const`/`let` here would collide with the same name in another
+   file and kill this one on load with a SyntaxError. */
+(() => {
 const D = (code, desc, o = {}) => Object.assign({ code, desc, at: 70, severity: 'medium' }, o);
 
 const C = (o) => Object.assign({ ecu: true, module: 'ECM', location: 'fixed', where: '', codes: [] }, o);
@@ -566,3 +570,5 @@ AGM.Dtc.protocol = function (blueprint) {
     const device = AGM.Dtc.deviceFor(blueprint);
     return device ? device.protocol : 'ISO 15765-4 CAN';
 };
+
+})();
