@@ -237,6 +237,9 @@ if (AGM.Config.payment.minAmount > AGM.Config.payment.maxAmount) bad('payment.mi
  * SyntaxError that silently kills whichever loads second - and the first sign
  * of it is a missing AGM.something at boot, a long way from the cause.
  * (`function` and `var` may legally be redeclared, so they are not flagged.)
+ *
+ * The convention that keeps this from happening: name anything at the top level
+ * of a file `ag_mechanic_<file>_<thing>`, so it cannot clash with another file.
  */
 step('no top-level name collisions between files');
 {
@@ -261,8 +264,6 @@ step('no top-level name collisions between files');
       } catch (_) {
         continue;
       }
-      /* A file wrapped in its own IIFE has no top-level names to clash. */
-      if (/^\s*(?:\/\*[\s\S]*?\*\/\s*)*\(\s*(?:\(\)|function)\s*/.test(src)) continue;
 
       for (const m of src.matchAll(decl)) {
         const name = m[2];

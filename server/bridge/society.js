@@ -7,13 +7,9 @@
  * ============================================================================
  */
 
-/* Own scope: FiveM evaluates every file in a resource into one shared global,
-   so a top-level `const`/`let` here would collide with the same name in another
-   file and kill this one on load with a SyntaxError. */
-(() => {
 AGM.society = {};
 
-const started = (res) => GetResourceState(res) === 'started';
+const ag_mechanic_society_started = (res) => GetResourceState(res) === 'started';
 
 function tryExport(resource, name, ...args) {
     try {
@@ -32,10 +28,10 @@ function tryExport(resource, name, ...args) {
 AGM.society.backend = 'player';
 
 AGM.society.detect = function () {
-    if (started('Renewed-Banking')) AGM.society.backend = 'renewed';
-    else if (started('fd_banking')) AGM.society.backend = 'fd';
-    else if (started('qbx_management')) AGM.society.backend = 'qbx_management';
-    else if (started('qb-management')) AGM.society.backend = 'qb_management';
+    if (ag_mechanic_society_started('Renewed-Banking')) AGM.society.backend = 'renewed';
+    else if (ag_mechanic_society_started('fd_banking')) AGM.society.backend = 'fd';
+    else if (ag_mechanic_society_started('qbx_management')) AGM.society.backend = 'qbx_management';
+    else if (ag_mechanic_society_started('qb-management')) AGM.society.backend = 'qb_management';
     else AGM.society.backend = 'player';
     AGM.log.info(`society account backend: ${AGM.society.backend}`);
     return AGM.society.backend;
@@ -149,4 +145,3 @@ AGM.society.deposit = function (amount, reason) {
     }
 };
 
-})();

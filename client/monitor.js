@@ -11,13 +11,9 @@
  * ============================================================================
  */
 
-/* Own scope: FiveM evaluates every file in a resource into one shared global,
-   so a top-level `const`/`let` here would collide with the same name in another
-   file and kill this one on load with a SyntaxError. */
-(() => {
 AGM.monitor = {};
 
-const D = AGM.Damage.detect;
+const ag_mechanic_monitor_detect = AGM.Damage.detect;
 
 /** Calls a native, returning `fallback` if it is missing or throws. */
 function safe(fn, fallback) {
@@ -32,7 +28,7 @@ function safe(fn, fallback) {
 /* Rolling per-vehicle sample, reset when the player changes vehicle. */
 let session = null;
 /** Accumulated wear, { sourceId: amount }. */
-let pending = {};
+let ag_mechanic_monitor_pending = {};
 let pendingDistance = 0;
 let lastFlush = 0;
 
@@ -53,14 +49,14 @@ function resetSession(vehicle, info) {
         tyreBurst: {},
         lastTick: GetGameTimer(),
     };
-    pending = {};
+    ag_mechanic_monitor_pending = {};
     pendingDistance = 0;
 }
 
 function add(source, amount) {
     if (!(amount > 0)) return;
     if (!AGM.Damage.applies(source, session.info.blueprint)) return;
-    pending[source] = (pending[source] || 0) + amount;
+    ag_mechanic_monitor_pending[source] = (ag_mechanic_monitor_pending[source] || 0) + amount;
 }
 
 /* ------------------------------------------------------------------ detectors */
@@ -70,22 +66,22 @@ function detectPowertrain(vehicle, blueprint, dt, rpm, speed) {
     if (!running) return;
 
     /* Sitting on the limiter. Worse with no load behind it. */
-    if (rpm > D.redlineRpm) {
+    if (rpm > ag_mechanic_monitor_detect.redlineRpm) {
         const noLoad = speed < 3.0;
-        add('redline', D.redlineWearPerSecond * dt * (noLoad ? D.redlineNoLoadMultiplier : 1));
+        add('redline', ag_mechanic_monitor_detect.redlineWearPerSecond * dt * (noLoad ? ag_mechanic_monitor_detect.redlineNoLoadMultiplier : 1));
     }
 
     /* A sudden jump in revs is a missed shift, not an engine getting faster. */
     const spike = rpm - session.rpm;
-    if (spike > D.overRevRpmDelta && rpm > 0.88) {
-        add('over_rev', D.overRevWear);
+    if (spike > ag_mechanic_monitor_detect.overRevRpmDelta && rpm > 0.88) {
+        add('over_rev', ag_mechanic_monitor_detect.overRevWear);
     }
 
     /* Heat soak: revs with no airflow. */
-    if (rpm > D.overheatRpm && speed < D.overheatMaxSpeed) {
+    if (rpm > ag_mechanic_monitor_detect.overheatRpm && speed < ag_mechanic_monitor_detect.overheatMaxSpeed) {
         session.overheatFor += dt;
-        if (session.overheatFor > D.overheatSeconds) {
-            add('overheat', D.overheatWearPerSecond * dt);
+        if (session.overheatFor > ag_mechanic_monitor_detect.overheatSeconds) {
+            add('overheat', ag_mechanic_monitor_detect.overheatWearPerSecond * dt);
         }
     } else {
         session.overheatFor = Math.max(0, session.overheatFor - dt * 2);
@@ -95,7 +91,7 @@ function detectPowertrain(vehicle, blueprint, dt, rpm, speed) {
 
     /* Wheelspin, from the driven wheels rather than from the throttle input. */
     if (safe(() => IsVehicleInBurnout(vehicle), false)) {
-        add('burnout', D.burnoutWearPerSecond * dt);
+        add('burnout', ag_mechanic_monitor_detect.burnoutWearPerSecond * dt);
     } else if (speed > 0.5) {
         const wheels = blueprint === 'bike' ? [1] : [2, 3];
         let worst = 0;
@@ -103,9 +99,9 @@ function detectPowertrain(vehicle, blueprint, dt, rpm, speed) {
             const wheelSpeed = Math.abs(safe(() => GetVehicleWheelSpeed(vehicle, wheel), 0));
             if (wheelSpeed > 0) worst = Math.max(worst, wheelSpeed / Math.max(speed, 1.0));
         }
-        if (worst > D.wheelspinRatio) {
-            const excess = Math.min(3.0, worst - D.wheelspinRatio + 1);
-            add('wheelspin', D.wheelspinWearPerSecond * dt * excess);
+        if (worst > ag_mechanic_monitor_detect.wheelspinRatio) {
+            const excess = Math.min(3.0, worst - ag_mechanic_monitor_detect.wheelspinRatio + 1);
+            add('wheelspin', ag_mechanic_monitor_detect.wheelspinWearPerSecond * dt * excess);
         }
     }
 }
@@ -114,10 +110,10 @@ function detectBraking(vehicle, dt, speed) {
     const decel = (session.speed - speed) / Math.max(dt, 0.01);
     const braking = IsControlPressed(0, 72) || IsDisabledControlPressed(0, 72);
 
-    if (braking && decel > D.hardBrakeDecel && speed > 4.0) {
+    if (braking && decel > ag_mechanic_monitor_detect.hardBrakeDecel && speed > 4.0) {
         session.brakeFor += dt;
-        const ramp = 1 + Math.min(D.brakeFadeRamp, session.brakeFor * 0.2);
-        add('hard_brake', D.hardBrakeWearPerSecond * dt * ramp);
+        const ramp = 1 + Math.min(ag_mechanic_monitor_detect.brakeFadeRamp, session.brakeFor * 0.2);
+        add('hard_brake', ag_mechanic_monitor_detect.hardBrakeWearPerSecond * dt * ramp);
     } else {
         session.brakeFor = Math.max(0, session.brakeFor - dt);
     }
@@ -127,30 +123,30 @@ function detectImpacts(vehicle, blueprint, dt, speed) {
     const body = safe(() => GetVehicleBodyHealth(vehicle), session.bodyHealth);
     const delta = session.bodyHealth - body;
 
-    if (delta > D.impactMinBodyDelta) {
+    if (delta > ag_mechanic_monitor_detect.impactMinBodyDelta) {
         const collided = safe(() => HasEntityCollidedWithAnything(vehicle), true);
-        const amount = delta * D.impactWearScale;
+        const amount = delta * ag_mechanic_monitor_detect.impactWearScale;
 
         if (!collided) {
             /* Body damage with nothing touched is gunfire, near enough. */
-            add('gunfire', delta * D.gunfireWearScale);
+            add('gunfire', delta * ag_mechanic_monitor_detect.gunfireWearScale);
         } else {
             const zone = impactZone(vehicle);
             add(zone, amount);
 
             /* A heavy shunt spreads into a second area. */
-            if (delta > D.impactHeavyDelta) {
+            if (delta > ag_mechanic_monitor_detect.impactHeavyDelta) {
                 add(zone === 'impact_front' ? 'impact_side' : 'impact_front', amount * 0.35);
             }
             /* Aircraft and boats hitting things at speed take it in the prop. */
             if ((blueprint === 'plane' || blueprint === 'boat') && speed > 8.0) {
-                add('prop_strike', Math.min(D.propStrikeWear, delta * 0.4));
+                add('prop_strike', Math.min(ag_mechanic_monitor_detect.propStrikeWear, delta * 0.4));
             }
         }
     }
 
     if (safe(() => IsEntityUpsidedown(vehicle), false)) {
-        add('rollover', D.rolloverWearPerSecond * dt);
+        add('rollover', ag_mechanic_monitor_detect.rolloverWearPerSecond * dt);
     }
 
     /* Tyres that have just gone flat without our doing. */
@@ -183,12 +179,12 @@ function impactZone(vehicle) {
 
 function detectTerrain(vehicle, blueprint, dt, speed) {
     if (blueprint !== 'car' && blueprint !== 'bike') return;
-    if (speed < D.offroadSpeed) return;
+    if (speed < ag_mechanic_monitor_detect.offroadSpeed) return;
 
     const coords = GetEntityCoords(vehicle, true);
     const onRoad = safe(() => IsPointOnRoad(coords[0], coords[1], coords[2], vehicle), true);
     if (!onRoad) {
-        add('offroad', D.offroadWearPerSecond * dt * Math.min(2.5, speed / D.offroadSpeed));
+        add('offroad', ag_mechanic_monitor_detect.offroadWearPerSecond * dt * Math.min(2.5, speed / ag_mechanic_monitor_detect.offroadSpeed));
     }
 }
 
@@ -210,16 +206,16 @@ function detectAirborne(vehicle, blueprint, dt) {
     session.fallSpeed = 0;
 
     if (blueprint === 'car' || blueprint === 'bike') {
-        if (fall > D.landingMinFallSpeed) {
-            add('hard_landing', (fall - D.landingMinFallSpeed) * D.landingWearScale);
+        if (fall > ag_mechanic_monitor_detect.landingMinFallSpeed) {
+            add('hard_landing', (fall - ag_mechanic_monitor_detect.landingMinFallSpeed) * ag_mechanic_monitor_detect.landingWearScale);
         }
     } else if (blueprint === 'heli') {
-        if (fall > D.heliSetdownFallSpeed) {
-            add('heli_setdown', (fall - D.heliSetdownFallSpeed) * D.landingWearScale);
+        if (fall > ag_mechanic_monitor_detect.heliSetdownFallSpeed) {
+            add('heli_setdown', (fall - ag_mechanic_monitor_detect.heliSetdownFallSpeed) * ag_mechanic_monitor_detect.landingWearScale);
         }
     } else if (blueprint === 'plane') {
-        if (fall > D.gearSlamFallSpeed) {
-            add('gear_slam', (fall - D.gearSlamFallSpeed) * D.landingWearScale);
+        if (fall > ag_mechanic_monitor_detect.gearSlamFallSpeed) {
+            add('gear_slam', (fall - ag_mechanic_monitor_detect.gearSlamFallSpeed) * ag_mechanic_monitor_detect.landingWearScale);
         }
     }
 }
@@ -229,8 +225,8 @@ function detectWater(vehicle, blueprint, dt) {
         /* Slamming off a wave: a sharp arrest of downward motion. */
         const velocity = safe(() => GetEntityVelocity(vehicle), [0, 0, 0]);
         const descent = -velocity[2];
-        if (session.fallSpeed > D.waveSlamFallSpeed && descent < 1.0) {
-            add('wave_slam', (session.fallSpeed - D.waveSlamFallSpeed) * D.waveSlamWearScale);
+        if (session.fallSpeed > ag_mechanic_monitor_detect.waveSlamFallSpeed && descent < 1.0) {
+            add('wave_slam', (session.fallSpeed - ag_mechanic_monitor_detect.waveSlamFallSpeed) * ag_mechanic_monitor_detect.waveSlamWearScale);
             session.fallSpeed = 0;
         } else {
             session.fallSpeed = Math.max(session.fallSpeed * 0.9, descent);
@@ -239,34 +235,34 @@ function detectWater(vehicle, blueprint, dt) {
     }
 
     const submerged = safe(() => GetEntitySubmergedLevel(vehicle), 0);
-    if (submerged > D.submergedLevel) {
-        add('submerged', D.submergedWearPerSecond * dt * submerged);
+    if (submerged > ag_mechanic_monitor_detect.submergedLevel) {
+        add('submerged', ag_mechanic_monitor_detect.submergedWearPerSecond * dt * submerged);
     }
 }
 
 function detectAircraft(vehicle, blueprint, dt, rpm, speed) {
     if (blueprint === 'heli') {
         const velocity = safe(() => GetEntityVelocity(vehicle), [0, 0, 0]);
-        if (rpm > D.overtorqueRpm && velocity[2] > D.overtorqueClimbRate) {
-            add('overtorque', D.overtorqueWearPerSecond * dt);
+        if (rpm > ag_mechanic_monitor_detect.overtorqueRpm && velocity[2] > ag_mechanic_monitor_detect.overtorqueClimbRate) {
+            add('overtorque', ag_mechanic_monitor_detect.overtorqueWearPerSecond * dt);
         }
 
         const rotor = safe(() => GetHeliMainRotorHealth(vehicle), session.mainRotor);
         if (session.mainRotor - rotor > 30) {
-            add('rotor_strike', Math.min(D.rotorStrikeWear, (session.mainRotor - rotor) * 0.05));
+            add('rotor_strike', Math.min(ag_mechanic_monitor_detect.rotorStrikeWear, (session.mainRotor - rotor) * 0.05));
         }
         session.mainRotor = rotor;
         return;
     }
 
     if (blueprint === 'plane') {
-        if (speed > D.overspeedMs) {
-            add('overspeed', D.overspeedWearPerSecond * dt * (speed / D.overspeedMs));
+        if (speed > ag_mechanic_monitor_detect.overspeedMs) {
+            add('overspeed', ag_mechanic_monitor_detect.overspeedWearPerSecond * dt * (speed / ag_mechanic_monitor_detect.overspeedMs));
         }
         const rotation = safe(() => GetEntityRotationVelocity(vehicle), [0, 0, 0]);
         const rate = Math.sqrt(rotation[0] ** 2 + rotation[1] ** 2 + rotation[2] ** 2);
-        if (rate > D.overGRate && speed > 40) {
-            add('over_g', D.overGWearPerSecond * dt * (rate / D.overGRate));
+        if (rate > ag_mechanic_monitor_detect.overGRate && speed > 40) {
+            add('over_g', ag_mechanic_monitor_detect.overGWearPerSecond * dt * (rate / ag_mechanic_monitor_detect.overGRate));
         }
     }
 }
@@ -275,19 +271,19 @@ function detectAircraft(vehicle, blueprint, dt, rpm, speed) {
 
 function flush() {
     if (!session) return;
-    const hasWear = Object.keys(pending).length > 0;
+    const hasWear = Object.keys(ag_mechanic_monitor_pending).length > 0;
     if (!hasWear && pendingDistance < 25) return;
 
     /* The vehicle identifies itself server-side from the network id; all we
        send is what we measured. */
     emitNet('ag_mechanic:server:wear', {
         netId: session.info.netId,
-        wear: pending,
+        wear: ag_mechanic_monitor_pending,
         distance: AGM.util.round(pendingDistance, 1),
     });
 
-    AGM.log.debug('flushed wear', pending, `${Math.round(pendingDistance)}m`);
-    pending = {};
+    AGM.log.debug('flushed wear', ag_mechanic_monitor_pending, `${Math.round(pendingDistance)}m`);
+    ag_mechanic_monitor_pending = {};
     pendingDistance = 0;
 }
 
@@ -374,4 +370,3 @@ AGM.monitor.start = function () {
 /** Flushes immediately, e.g. before a repair so the numbers are current. */
 AGM.monitor.flushNow = flush;
 
-})();

@@ -31,11 +31,7 @@
  * ============================================================================
  */
 
-/* Own scope: FiveM evaluates every file in a resource into one shared global,
-   so a top-level `const`/`let` here would collide with the same name in another
-   file and kill this one on load with a SyntaxError. */
-(() => {
-const C = (id, label, group, o = {}) => Object.assign({
+const ag_mechanic_components_def = (id, label, group, o = {}) => Object.assign({
     id,
     label,
     group,
@@ -57,112 +53,112 @@ const C = (id, label, group, o = {}) => Object.assign({
 /* -------------------------------------------------------------- automobile */
 const CAR = [
     // --- engine bay ---------------------------------------------------------
-    C('engine', 'Engine Block & Internals', 'engine', {
+    ag_mechanic_components_def('engine', 'Engine Block & Internals', 'engine', {
         repair: 'garage', part: 'engine_block', critical: true, decay: 0.7,
         effects: { power: 45, torque: 40 },
     }),
-    C('gaskets', 'Head Gasket & Seals', 'engine', {
+    ag_mechanic_components_def('gaskets', 'Head Gasket & Seals', 'engine', {
         repair: 'garage', part: 'gasket_set', decay: 1.1,
         effects: { power: 12, torque: 10 },
         wearOn: { engine: 1.8 },
     }),
-    C('air_filter', 'Air Filter', 'engine', {
+    ag_mechanic_components_def('air_filter', 'Air Filter', 'engine', {
         repair: 'mobile', part: 'air_filter', field: true, fieldItems: ['ducttape'], decay: 1.6,
         effects: { power: 9 },
     }),
-    C('spark_plugs', 'Spark Plugs & Coil Packs', 'engine', {
+    ag_mechanic_components_def('spark_plugs', 'Spark Plugs & Coil Packs', 'engine', {
         repair: 'mobile', part: 'spark_plugs', decay: 1.3,
         effects: { power: 11, torque: 7 },
     }),
-    C('oil_system', 'Oil Pump, Filter & Sump', 'engine', {
+    ag_mechanic_components_def('oil_system', 'Oil Pump, Filter & Sump', 'engine', {
         repair: 'mobile', part: 'oil_filter', field: true, fieldItems: ['ducttape'], garageBelow: 15, decay: 1.2,
         effects: { power: 6 },
         wearOn: { engine: 2.6, gearbox: 1.2 },
     }),
-    C('radiator', 'Radiator, Fan & Coolant', 'engine', {
+    ag_mechanic_components_def('radiator', 'Radiator, Fan & Coolant', 'engine', {
         repair: 'mobile', part: 'radiator', field: true, fieldItems: ['ducttape'], garageBelow: 20, decay: 1.4,
         effects: { power: 7 },
         wearOn: { engine: 2.2, gaskets: 2.0 },
     }),
-    C('fuel_system', 'Fuel Pump & Lines', 'engine', {
+    ag_mechanic_components_def('fuel_system', 'Fuel Pump & Lines', 'engine', {
         repair: 'mobile', part: 'fuel_pump', field: true, fieldItems: ['zipties'], critical: true, decay: 1.1,
         effects: { power: 14 },
     }),
-    C('exhaust', 'Exhaust & Manifold', 'engine', {
+    ag_mechanic_components_def('exhaust', 'Exhaust & Manifold', 'engine', {
         repair: 'mobile', part: 'exhaust', field: true, fieldItems: ['ducttape'], decay: 1.5,
         effects: { power: 7 },
     }),
-    C('ecu', 'ECU & Wiring Harness', 'electrical', {
+    ag_mechanic_components_def('ecu', 'ECU & Wiring Harness', 'electrical', {
         repair: 'mobile', part: 'wiring_harness', field: true, fieldItems: ['zipties'], critical: true, decay: 0.9,
         effects: { power: 10, torque: 5 },
     }),
-    C('battery', 'Battery & Alternator', 'electrical', {
+    ag_mechanic_components_def('battery', 'Battery & Alternator', 'electrical', {
         repair: 'mobile', part: 'battery', field: true, fieldItems: ['zipties'], critical: true, decay: 1.2,
         effects: {},
     }),
 
     // --- drivetrain ---------------------------------------------------------
-    C('clutch', 'Clutch & Flywheel', 'drivetrain', {
+    ag_mechanic_components_def('clutch', 'Clutch & Flywheel', 'drivetrain', {
         repair: 'garage', part: 'clutch_kit', critical: true, decay: 1.2,
         effects: { torque: 30, power: 10 },
     }),
-    C('gearbox', 'Gearbox', 'drivetrain', {
+    ag_mechanic_components_def('gearbox', 'Gearbox', 'drivetrain', {
         repair: 'garage', part: 'gearbox', critical: true, decay: 0.9,
         effects: { torque: 25, power: 12 },
     }),
-    C('driveshaft', 'Driveshaft & Differential', 'drivetrain', {
+    ag_mechanic_components_def('driveshaft', 'Driveshaft & Differential', 'drivetrain', {
         repair: 'garage', part: 'driveshaft', critical: true, decay: 0.9,
         effects: { torque: 20, traction: 8 },
     }),
 
     // --- running gear -------------------------------------------------------
-    C('brake_pads', 'Brake Pads & Discs', 'brakes', {
+    ag_mechanic_components_def('brake_pads', 'Brake Pads & Discs', 'brakes', {
         repair: 'mobile', part: 'brake_pads', decay: 1.5,
         effects: { brakes: 45 },
     }),
-    C('brake_lines', 'Brake Lines & Master Cylinder', 'brakes', {
+    ag_mechanic_components_def('brake_lines', 'Brake Lines & Master Cylinder', 'brakes', {
         repair: 'mobile', part: 'brake_lines', field: true, fieldItems: ['ducttape'], decay: 1.0,
         effects: { brakes: 55 },
     }),
-    C('suspension', 'Suspension, Springs & Dampers', 'chassis', {
+    ag_mechanic_components_def('suspension', 'Suspension, Springs & Dampers', 'chassis', {
         repair: 'mobile', part: 'suspension_kit', garageBelow: 25, decay: 1.2,
         effects: { suspension: 60, traction: 15, steering: 10 },
     }),
-    C('steering', 'Steering Rack & Column', 'chassis', {
+    ag_mechanic_components_def('steering', 'Steering Rack & Column', 'chassis', {
         repair: 'garage', part: 'steering_rack', critical: true, decay: 0.8,
         effects: { steering: 70 },
     }),
-    C('wheels', 'Wheels & Hubs', 'chassis', {
+    ag_mechanic_components_def('wheels', 'Wheels & Hubs', 'chassis', {
         repair: 'mobile', part: 'wheel_rim', decay: 1.1,
         effects: { traction: 8, steering: 8, suspension: 10 },
     }),
-    C('tire_fl', 'Front Left Tyre', 'tyres', {
+    ag_mechanic_components_def('tire_fl', 'Front Left Tyre', 'tyres', {
         repair: 'mobile', part: 'tire', field: true, fieldItems: ['ducttape'], decay: 1.0, wheelIndex: 0,
         effects: { traction: 11, steering: 6 },
     }),
-    C('tire_fr', 'Front Right Tyre', 'tyres', {
+    ag_mechanic_components_def('tire_fr', 'Front Right Tyre', 'tyres', {
         repair: 'mobile', part: 'tire', field: true, fieldItems: ['ducttape'], decay: 1.0, wheelIndex: 1,
         effects: { traction: 11, steering: 6 },
     }),
-    C('tire_rl', 'Rear Left Tyre', 'tyres', {
+    ag_mechanic_components_def('tire_rl', 'Rear Left Tyre', 'tyres', {
         repair: 'mobile', part: 'tire', field: true, fieldItems: ['ducttape'], decay: 1.0, wheelIndex: 4,
         effects: { traction: 11 },
     }),
-    C('tire_rr', 'Rear Right Tyre', 'tyres', {
+    ag_mechanic_components_def('tire_rr', 'Rear Right Tyre', 'tyres', {
         repair: 'mobile', part: 'tire', field: true, fieldItems: ['ducttape'], decay: 1.0, wheelIndex: 5,
         effects: { traction: 11 },
     }),
 
     // --- body ---------------------------------------------------------------
-    C('body', 'Body Panels & Frame', 'body', {
+    ag_mechanic_components_def('body', 'Body Panels & Frame', 'body', {
         repair: 'garage', part: 'body_panel', field: true, fieldItems: ['ducttape'], garageBelow: 100, decay: 1.0,
         effects: {},
     }),
-    C('windows', 'Glass & Windscreen', 'body', {
+    ag_mechanic_components_def('windows', 'Glass & Windscreen', 'body', {
         repair: 'mobile', part: 'glass_set', field: true, fieldItems: ['ducttape'], decay: 1.0,
         effects: {},
     }),
-    C('lights', 'Lighting & Indicators', 'body', {
+    ag_mechanic_components_def('lights', 'Lighting & Indicators', 'body', {
         repair: 'mobile', part: 'light_assembly', field: true, fieldItems: ['ducttape'], decay: 1.0,
         effects: {},
     }),
@@ -170,296 +166,296 @@ const CAR = [
 
 /* -------------------------------------------------------------- motorcycle */
 const BIKE = [
-    C('engine', 'Engine & Internals', 'engine', {
+    ag_mechanic_components_def('engine', 'Engine & Internals', 'engine', {
         repair: 'garage', part: 'engine_block', critical: true, decay: 0.8,
         effects: { power: 45, torque: 40 },
     }),
-    C('gaskets', 'Head Gasket & Seals', 'engine', {
+    ag_mechanic_components_def('gaskets', 'Head Gasket & Seals', 'engine', {
         repair: 'garage', part: 'gasket_set', decay: 1.1,
         effects: { power: 12, torque: 10 }, wearOn: { engine: 1.8 },
     }),
-    C('air_filter', 'Air Filter', 'engine', {
+    ag_mechanic_components_def('air_filter', 'Air Filter', 'engine', {
         repair: 'mobile', part: 'air_filter', field: true, fieldItems: ['ducttape'], decay: 1.7,
         effects: { power: 10 },
     }),
-    C('spark_plugs', 'Spark Plugs & Coils', 'engine', {
+    ag_mechanic_components_def('spark_plugs', 'Spark Plugs & Coils', 'engine', {
         repair: 'mobile', part: 'spark_plugs', decay: 1.4,
         effects: { power: 12, torque: 8 },
     }),
-    C('oil_system', 'Oil Pump & Filter', 'engine', {
+    ag_mechanic_components_def('oil_system', 'Oil Pump & Filter', 'engine', {
         repair: 'mobile', part: 'oil_filter', field: true, fieldItems: ['ducttape'], garageBelow: 15, decay: 1.3,
         effects: { power: 6 }, wearOn: { engine: 2.8 },
     }),
-    C('radiator', 'Radiator & Coolant', 'engine', {
+    ag_mechanic_components_def('radiator', 'Radiator & Coolant', 'engine', {
         repair: 'mobile', part: 'radiator', field: true, fieldItems: ['ducttape'], garageBelow: 20, decay: 1.5,
         effects: { power: 8 }, wearOn: { engine: 2.4, gaskets: 2.0 },
     }),
-    C('fuel_system', 'Fuel Pump & Lines', 'engine', {
+    ag_mechanic_components_def('fuel_system', 'Fuel Pump & Lines', 'engine', {
         repair: 'mobile', part: 'fuel_pump', field: true, fieldItems: ['zipties'], critical: true, decay: 1.1,
         effects: { power: 14 },
     }),
-    C('exhaust', 'Exhaust & Header', 'engine', {
+    ag_mechanic_components_def('exhaust', 'Exhaust & Header', 'engine', {
         repair: 'mobile', part: 'exhaust', field: true, fieldItems: ['ducttape'], decay: 1.5,
         effects: { power: 8 },
     }),
-    C('ecu', 'ECU & Loom', 'electrical', {
+    ag_mechanic_components_def('ecu', 'ECU & Loom', 'electrical', {
         repair: 'mobile', part: 'wiring_harness', field: true, fieldItems: ['zipties'], critical: true, decay: 1.0,
         effects: { power: 10 },
     }),
-    C('battery', 'Battery & Regulator', 'electrical', {
+    ag_mechanic_components_def('battery', 'Battery & Regulator', 'electrical', {
         repair: 'mobile', part: 'battery', field: true, fieldItems: ['zipties'], critical: true, decay: 1.2,
     }),
-    C('clutch', 'Clutch Basket & Plates', 'drivetrain', {
+    ag_mechanic_components_def('clutch', 'Clutch Basket & Plates', 'drivetrain', {
         repair: 'garage', part: 'clutch_kit', critical: true, decay: 1.3,
         effects: { torque: 30, power: 10 },
     }),
-    C('gearbox', 'Gearbox & Selector', 'drivetrain', {
+    ag_mechanic_components_def('gearbox', 'Gearbox & Selector', 'drivetrain', {
         repair: 'garage', part: 'gearbox', critical: true, decay: 1.0,
         effects: { torque: 25, power: 12 },
     }),
     /* A snapped chain is the bike equivalent of a driveshaft - but unlike a
        driveshaft it is genuinely a roadside job, so bikes get towed less. */
-    C('chain_drive', 'Final Drive Chain & Sprockets', 'drivetrain', {
+    ag_mechanic_components_def('chain_drive', 'Final Drive Chain & Sprockets', 'drivetrain', {
         repair: 'mobile', part: 'drive_chain', field: true, fieldItems: ['zipties'], critical: true, decay: 1.6,
         effects: { torque: 18, traction: 6 },
     }),
-    C('brake_pads', 'Brake Pads & Discs', 'brakes', {
+    ag_mechanic_components_def('brake_pads', 'Brake Pads & Discs', 'brakes', {
         repair: 'mobile', part: 'brake_pads', decay: 1.6,
         effects: { brakes: 45 },
     }),
-    C('brake_lines', 'Brake Lines & Master Cylinder', 'brakes', {
+    ag_mechanic_components_def('brake_lines', 'Brake Lines & Master Cylinder', 'brakes', {
         repair: 'mobile', part: 'brake_lines', field: true, fieldItems: ['ducttape'], decay: 1.0,
         effects: { brakes: 55 },
     }),
-    C('suspension', 'Forks & Rear Shock', 'chassis', {
+    ag_mechanic_components_def('suspension', 'Forks & Rear Shock', 'chassis', {
         repair: 'mobile', part: 'suspension_kit', garageBelow: 25, decay: 1.3,
         effects: { suspension: 60, traction: 15, steering: 12 },
     }),
-    C('steering', 'Triple Clamp & Head Bearings', 'chassis', {
+    ag_mechanic_components_def('steering', 'Triple Clamp & Head Bearings', 'chassis', {
         repair: 'garage', part: 'steering_rack', critical: true, decay: 0.9,
         effects: { steering: 70 },
     }),
-    C('wheels', 'Wheels & Bearings', 'chassis', {
+    ag_mechanic_components_def('wheels', 'Wheels & Bearings', 'chassis', {
         repair: 'mobile', part: 'wheel_rim', decay: 1.1,
         effects: { traction: 10, steering: 10, suspension: 10 },
     }),
-    C('tire_front', 'Front Tyre', 'tyres', {
+    ag_mechanic_components_def('tire_front', 'Front Tyre', 'tyres', {
         repair: 'mobile', part: 'tire', field: true, fieldItems: ['ducttape'], decay: 1.1, wheelIndex: 0,
         effects: { traction: 20, steering: 12 },
     }),
-    C('tire_rear', 'Rear Tyre', 'tyres', {
+    ag_mechanic_components_def('tire_rear', 'Rear Tyre', 'tyres', {
         repair: 'mobile', part: 'tire', field: true, fieldItems: ['ducttape'], decay: 1.3, wheelIndex: 4,
         effects: { traction: 24 },
     }),
-    C('body', 'Frame & Subframe', 'body', {
+    ag_mechanic_components_def('body', 'Frame & Subframe', 'body', {
         repair: 'garage', part: 'body_panel', field: true, fieldItems: ['ducttape'], decay: 1.0,
     }),
-    C('windows', 'Fairing & Screen', 'body', {
+    ag_mechanic_components_def('windows', 'Fairing & Screen', 'body', {
         repair: 'mobile', part: 'glass_set', field: true, fieldItems: ['ducttape'], decay: 1.1,
     }),
-    C('lights', 'Lighting & Indicators', 'body', {
+    ag_mechanic_components_def('lights', 'Lighting & Indicators', 'body', {
         repair: 'mobile', part: 'light_assembly', field: true, fieldItems: ['ducttape'], decay: 1.0,
     }),
 ];
 
 /* -------------------------------------------------------------- rotorcraft */
 const HELI = [
-    C('engine', 'Turbine / Powerplant', 'engine', {
+    ag_mechanic_components_def('engine', 'Turbine / Powerplant', 'engine', {
         repair: 'garage', part: 'turbine_module', critical: true, decay: 0.7,
         effects: { power: 50, lift: 30 },
     }),
-    C('air_filter', 'Intake Filter & Particle Separator', 'engine', {
+    ag_mechanic_components_def('air_filter', 'Intake Filter & Particle Separator', 'engine', {
         repair: 'mobile', part: 'air_filter', field: true, fieldItems: ['ducttape'], decay: 1.6,
         effects: { power: 10 },
     }),
-    C('oil_system', 'Engine & Transmission Oil System', 'engine', {
+    ag_mechanic_components_def('oil_system', 'Engine & Transmission Oil System', 'engine', {
         repair: 'mobile', part: 'oil_filter', field: true, fieldItems: ['ducttape'], garageBelow: 20, decay: 1.3,
         effects: { power: 8 },
         wearOn: { engine: 2.6, main_gearbox: 2.4 },
     }),
-    C('fuel_system', 'Fuel Pumps & Lines', 'engine', {
+    ag_mechanic_components_def('fuel_system', 'Fuel Pumps & Lines', 'engine', {
         repair: 'mobile', part: 'fuel_pump', field: true, fieldItems: ['zipties'], critical: true, decay: 1.1,
         effects: { power: 14 },
     }),
-    C('ignition', 'FADEC & Igniters', 'electrical', {
+    ag_mechanic_components_def('ignition', 'FADEC & Igniters', 'electrical', {
         repair: 'mobile', part: 'wiring_harness', field: true, fieldItems: ['zipties'], critical: true, decay: 1.0,
         effects: { power: 12 },
     }),
-    C('battery', 'Battery & Generator', 'electrical', {
+    ag_mechanic_components_def('battery', 'Battery & Generator', 'electrical', {
         repair: 'mobile', part: 'battery', field: true, fieldItems: ['zipties'], critical: true, decay: 1.2,
     }),
-    C('avionics', 'Avionics & Instruments', 'electrical', {
+    ag_mechanic_components_def('avionics', 'Avionics & Instruments', 'electrical', {
         repair: 'mobile', part: 'avionics_unit', field: true, fieldItems: ['zipties'], decay: 1.1,
         effects: { control: 15 },
     }),
 
-    C('main_gearbox', 'Main Rotor Gearbox', 'drivetrain', {
+    ag_mechanic_components_def('main_gearbox', 'Main Rotor Gearbox', 'drivetrain', {
         repair: 'garage', part: 'rotor_gearbox', critical: true, decay: 0.8,
         effects: { lift: 30, power: 15, control: 10 },
     }),
-    C('main_rotor', 'Main Rotor Head & Blades', 'rotor', {
+    ag_mechanic_components_def('main_rotor', 'Main Rotor Head & Blades', 'rotor', {
         repair: 'garage', part: 'main_rotor_blade', critical: true, decay: 0.9,
         effects: { lift: 55, control: 25 },
     }),
-    C('tail_rotor', 'Tail Rotor & Blades', 'rotor', {
+    ag_mechanic_components_def('tail_rotor', 'Tail Rotor & Blades', 'rotor', {
         repair: 'garage', part: 'tail_rotor_blade', critical: true, decay: 1.1,
         effects: { yaw: 70, control: 20 },
     }),
-    C('tail_drive', 'Tail Drive Shaft & Boom', 'rotor', {
+    ag_mechanic_components_def('tail_drive', 'Tail Drive Shaft & Boom', 'rotor', {
         repair: 'garage', part: 'tail_drive_shaft', critical: true, decay: 0.9,
         effects: { yaw: 30 },
     }),
-    C('hydraulics', 'Swashplate & Hydraulics', 'controls', {
+    ag_mechanic_components_def('hydraulics', 'Swashplate & Hydraulics', 'controls', {
         repair: 'garage', part: 'hydraulic_pack', critical: true, decay: 1.0,
         effects: { control: 55 },
     }),
-    C('controls', 'Cyclic, Collective & Linkages', 'controls', {
+    ag_mechanic_components_def('controls', 'Cyclic, Collective & Linkages', 'controls', {
         repair: 'mobile', part: 'control_linkage', field: true, fieldItems: ['zipties'], garageBelow: 25, decay: 1.1,
         effects: { control: 30, yaw: 15 },
     }),
-    C('skids', 'Landing Skids / Gear', 'body', {
+    ag_mechanic_components_def('skids', 'Landing Skids / Gear', 'body', {
         repair: 'mobile', part: 'landing_gear', field: true, fieldItems: ['ducttape'], garageBelow: 20, decay: 1.2,
     }),
-    C('airframe', 'Airframe & Tail Boom Structure', 'body', {
+    ag_mechanic_components_def('airframe', 'Airframe & Tail Boom Structure', 'body', {
         repair: 'garage', part: 'airframe_section', field: true, fieldItems: ['ducttape'], decay: 1.0,
         effects: { control: 10 },
     }),
-    C('windows', 'Canopy & Glazing', 'body', {
+    ag_mechanic_components_def('windows', 'Canopy & Glazing', 'body', {
         repair: 'mobile', part: 'glass_set', field: true, fieldItems: ['ducttape'], decay: 1.0,
     }),
-    C('lights', 'Nav, Anti-Collision & Landing Lights', 'body', {
+    ag_mechanic_components_def('lights', 'Nav, Anti-Collision & Landing Lights', 'body', {
         repair: 'mobile', part: 'light_assembly', field: true, fieldItems: ['ducttape'], decay: 1.0,
     }),
 ];
 
 /* --------------------------------------------------------- fixed-wing */
 const PLANE = [
-    C('engine', 'Powerplant', 'engine', {
+    ag_mechanic_components_def('engine', 'Powerplant', 'engine', {
         repair: 'garage', part: 'turbine_module', critical: true, decay: 0.7,
         effects: { power: 50, lift: 20 },
     }),
-    C('air_filter', 'Intake & Filters', 'engine', {
+    ag_mechanic_components_def('air_filter', 'Intake & Filters', 'engine', {
         repair: 'mobile', part: 'air_filter', field: true, fieldItems: ['ducttape'], decay: 1.6,
         effects: { power: 10 },
     }),
-    C('ignition', 'Ignition & Engine Control', 'engine', {
+    ag_mechanic_components_def('ignition', 'Ignition & Engine Control', 'engine', {
         repair: 'mobile', part: 'spark_plugs', critical: true, decay: 1.3,
         effects: { power: 12 },
     }),
-    C('oil_system', 'Oil System', 'engine', {
+    ag_mechanic_components_def('oil_system', 'Oil System', 'engine', {
         repair: 'mobile', part: 'oil_filter', field: true, fieldItems: ['ducttape'], garageBelow: 20, decay: 1.3,
         effects: { power: 8 }, wearOn: { engine: 2.6 },
     }),
-    C('fuel_system', 'Fuel Pumps, Tanks & Lines', 'engine', {
+    ag_mechanic_components_def('fuel_system', 'Fuel Pumps, Tanks & Lines', 'engine', {
         repair: 'mobile', part: 'fuel_pump', field: true, fieldItems: ['zipties'], critical: true, decay: 1.1,
         effects: { power: 14 },
     }),
-    C('propeller', 'Propeller / Fan Assembly', 'drivetrain', {
+    ag_mechanic_components_def('propeller', 'Propeller / Fan Assembly', 'drivetrain', {
         repair: 'garage', part: 'propeller', critical: true, decay: 1.0,
         effects: { power: 30, lift: 15 },
     }),
-    C('battery', 'Battery & Generator', 'electrical', {
+    ag_mechanic_components_def('battery', 'Battery & Generator', 'electrical', {
         repair: 'mobile', part: 'battery', field: true, fieldItems: ['zipties'], critical: true, decay: 1.2,
     }),
-    C('avionics', 'Avionics & Instruments', 'electrical', {
+    ag_mechanic_components_def('avionics', 'Avionics & Instruments', 'electrical', {
         repair: 'mobile', part: 'avionics_unit', field: true, fieldItems: ['zipties'], decay: 1.1,
         effects: { control: 15 },
     }),
-    C('hydraulics', 'Hydraulic System', 'controls', {
+    ag_mechanic_components_def('hydraulics', 'Hydraulic System', 'controls', {
         repair: 'garage', part: 'hydraulic_pack', critical: true, decay: 1.0,
         effects: { control: 35 },
     }),
-    C('ailerons', 'Ailerons & Roll Control', 'controls', {
+    ag_mechanic_components_def('ailerons', 'Ailerons & Roll Control', 'controls', {
         repair: 'mobile', part: 'control_surface', field: true, fieldItems: ['ducttape'], garageBelow: 25, decay: 1.2,
         effects: { control: 30 },
     }),
-    C('elevator', 'Elevator & Pitch Control', 'controls', {
+    ag_mechanic_components_def('elevator', 'Elevator & Pitch Control', 'controls', {
         repair: 'mobile', part: 'control_surface', field: true, fieldItems: ['ducttape'], garageBelow: 25, critical: true, decay: 1.2,
         effects: { control: 30, lift: 10 },
     }),
-    C('rudder', 'Rudder & Yaw Control', 'controls', {
+    ag_mechanic_components_def('rudder', 'Rudder & Yaw Control', 'controls', {
         repair: 'mobile', part: 'control_surface', field: true, fieldItems: ['ducttape'], garageBelow: 25, decay: 1.2,
         effects: { yaw: 70 },
     }),
-    C('flaps', 'Flaps & Slats', 'controls', {
+    ag_mechanic_components_def('flaps', 'Flaps & Slats', 'controls', {
         repair: 'mobile', part: 'control_surface', field: true, fieldItems: ['zipties'], decay: 1.3,
         effects: { lift: 20, control: 10 },
     }),
-    C('landing_gear', 'Landing Gear & Actuators', 'body', {
+    ag_mechanic_components_def('landing_gear', 'Landing Gear & Actuators', 'body', {
         repair: 'garage', part: 'landing_gear', field: true, fieldItems: ['zipties'], garageBelow: 30, decay: 1.3,
     }),
-    C('wheel_brakes', 'Wheel Brakes', 'brakes', {
+    ag_mechanic_components_def('wheel_brakes', 'Wheel Brakes', 'brakes', {
         repair: 'mobile', part: 'brake_pads', decay: 1.4,
         effects: { brakes: 100 },
     }),
-    C('airframe', 'Airframe, Wings & Spars', 'body', {
+    ag_mechanic_components_def('airframe', 'Airframe, Wings & Spars', 'body', {
         repair: 'garage', part: 'airframe_section', field: true, fieldItems: ['ducttape'], decay: 0.9,
         effects: { control: 10, lift: 15 },
     }),
-    C('windows', 'Canopy & Glazing', 'body', {
+    ag_mechanic_components_def('windows', 'Canopy & Glazing', 'body', {
         repair: 'mobile', part: 'glass_set', field: true, fieldItems: ['ducttape'], decay: 1.0,
     }),
-    C('lights', 'Nav & Landing Lights', 'body', {
+    ag_mechanic_components_def('lights', 'Nav & Landing Lights', 'body', {
         repair: 'mobile', part: 'light_assembly', field: true, fieldItems: ['ducttape'], decay: 1.0,
     }),
 ];
 
 /* -------------------------------------------------------------- watercraft */
 const BOAT = [
-    C('engine', 'Marine Engine', 'engine', {
+    ag_mechanic_components_def('engine', 'Marine Engine', 'engine', {
         repair: 'garage', part: 'engine_block', critical: true, decay: 0.8,
         effects: { power: 50, torque: 35 },
     }),
-    C('air_filter', 'Intake & Flame Arrestor', 'engine', {
+    ag_mechanic_components_def('air_filter', 'Intake & Flame Arrestor', 'engine', {
         repair: 'mobile', part: 'air_filter', field: true, fieldItems: ['ducttape'], decay: 1.5,
         effects: { power: 9 },
     }),
-    C('ignition', 'Ignition & Plugs', 'engine', {
+    ag_mechanic_components_def('ignition', 'Ignition & Plugs', 'engine', {
         repair: 'mobile', part: 'spark_plugs', decay: 1.4,
         effects: { power: 12 },
     }),
-    C('oil_system', 'Oil System', 'engine', {
+    ag_mechanic_components_def('oil_system', 'Oil System', 'engine', {
         repair: 'mobile', part: 'oil_filter', field: true, fieldItems: ['ducttape'], garageBelow: 20, decay: 1.3,
         effects: { power: 7 }, wearOn: { engine: 2.6 },
     }),
-    C('cooling', 'Raw Water Cooling & Impeller', 'engine', {
+    ag_mechanic_components_def('cooling', 'Raw Water Cooling & Impeller', 'engine', {
         repair: 'mobile', part: 'radiator', field: true, fieldItems: ['ducttape'], garageBelow: 20, decay: 1.5,
         effects: { power: 8 }, wearOn: { engine: 2.4 },
     }),
-    C('fuel_system', 'Fuel Pump & Lines', 'engine', {
+    ag_mechanic_components_def('fuel_system', 'Fuel Pump & Lines', 'engine', {
         repair: 'mobile', part: 'fuel_pump', field: true, fieldItems: ['zipties'], critical: true, decay: 1.1,
         effects: { power: 14 },
     }),
-    C('battery', 'Battery & Alternator', 'electrical', {
+    ag_mechanic_components_def('battery', 'Battery & Alternator', 'electrical', {
         repair: 'mobile', part: 'battery', field: true, fieldItems: ['zipties'], critical: true, decay: 1.2,
     }),
-    C('ecu', 'ECU & Wiring', 'electrical', {
+    ag_mechanic_components_def('ecu', 'ECU & Wiring', 'electrical', {
         repair: 'mobile', part: 'wiring_harness', field: true, fieldItems: ['zipties'], critical: true, decay: 1.0,
         effects: { power: 10 },
     }),
-    C('gearbox', 'Outdrive & Gearbox', 'drivetrain', {
+    ag_mechanic_components_def('gearbox', 'Outdrive & Gearbox', 'drivetrain', {
         repair: 'garage', part: 'gearbox', critical: true, decay: 1.0,
         effects: { torque: 30, power: 12 },
     }),
-    C('propeller', 'Propeller & Shaft', 'drivetrain', {
+    ag_mechanic_components_def('propeller', 'Propeller & Shaft', 'drivetrain', {
         repair: 'mobile', part: 'propeller', garageBelow: 25, critical: true, decay: 1.4,
         effects: { power: 25, torque: 20 },
     }),
-    C('steering', 'Helm & Steering Cables', 'controls', {
+    ag_mechanic_components_def('steering', 'Helm & Steering Cables', 'controls', {
         repair: 'mobile', part: 'steering_rack', field: true, fieldItems: ['zipties'], garageBelow: 25, critical: true, decay: 1.0,
         effects: { steering: 100 },
     }),
-    C('hull', 'Hull & Stringers', 'body', {
+    ag_mechanic_components_def('hull', 'Hull & Stringers', 'body', {
         repair: 'garage', part: 'body_panel', field: true, fieldItems: ['ducttape'], decay: 1.0,
         effects: { traction: 20 },
     }),
-    C('bilge_pump', 'Bilge Pump', 'body', {
+    ag_mechanic_components_def('bilge_pump', 'Bilge Pump', 'body', {
         repair: 'mobile', part: 'bilge_pump', field: true, fieldItems: ['zipties'], decay: 1.3,
     }),
-    C('windows', 'Screen & Glazing', 'body', {
+    ag_mechanic_components_def('windows', 'Screen & Glazing', 'body', {
         repair: 'mobile', part: 'glass_set', field: true, fieldItems: ['ducttape'], decay: 1.0,
     }),
-    C('lights', 'Navigation Lights', 'body', {
+    ag_mechanic_components_def('lights', 'Navigation Lights', 'body', {
         repair: 'mobile', part: 'light_assembly', field: true, fieldItems: ['ducttape'], decay: 1.0,
     }),
 ];
@@ -546,4 +542,3 @@ AGM.Components.axisTotal = (blueprint, axis) => (AGM.Components._axisTotals[blue
 /** Component ids for a blueprint. */
 AGM.Components.ids = (blueprint) => AGM.Components.list(blueprint).map((c) => c.id);
 
-})();

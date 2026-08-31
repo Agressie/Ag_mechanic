@@ -10,13 +10,9 @@
  * ============================================================================
  */
 
-/* Own scope: FiveM evaluates every file in a resource into one shared global,
-   so a top-level `const`/`let` here would collide with the same name in another
-   file and kill this one on load with a SyntaxError. */
-(() => {
 AGM.diagnose = {};
 
-let busy = false;
+let ag_mechanic_diagnose_busy = false;
 
 /** Bonnet-equivalent access for the blueprint, or null where there is none. */
 function accessPanel(blueprint) {
@@ -68,7 +64,7 @@ function minigameConfig(blueprint) {
  * backed out or the server refused.
  */
 AGM.diagnose.run = async function (vehicle) {
-    if (busy) return null;
+    if (ag_mechanic_diagnose_busy) return null;
 
     const info = AGM.state.describe(vehicle);
     if (!info) {
@@ -80,7 +76,7 @@ AGM.diagnose.run = async function (vehicle) {
         return null;
     }
 
-    busy = true;
+    ag_mechanic_diagnose_busy = true;
     const ped = PlayerPedId();
     const panel = accessPanel(info.blueprint);
 
@@ -120,7 +116,7 @@ AGM.diagnose.run = async function (vehicle) {
 
         return response.report;
     } finally {
-        busy = false;
+        ag_mechanic_diagnose_busy = false;
         stopSceneAnim(ped);
         if (panel && panel.door !== null && DoesEntityExist(vehicle)) {
             SetVehicleDoorShut(vehicle, panel.door, false);
@@ -176,4 +172,3 @@ function reasonText(reason) {
 }
 AGM.diagnose.reasonText = reasonText;
 
-})();

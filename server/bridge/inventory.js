@@ -13,7 +13,7 @@
 
 AGM.inv = {};
 
-const started = (res) => GetResourceState(res) === 'started';
+const ag_mechanic_inventory_started = (res) => GetResourceState(res) === 'started';
 
 function tryExport(resource, name, ...args) {
     try {
@@ -35,13 +35,13 @@ AGM.inv.backend = 'none';
 AGM.inv.stashBackend = 'db';
 
 AGM.inv.detect = function () {
-    if (started('ox_inventory')) {
+    if (ag_mechanic_inventory_started('ox_inventory')) {
         AGM.inv.backend = 'ox';
         AGM.inv.stashBackend = 'ox';
-    } else if (started('qb-inventory')) {
+    } else if (ag_mechanic_inventory_started('qb-inventory')) {
         AGM.inv.backend = 'qb';
         AGM.inv.stashBackend = 'qb';
-    } else if (started('es_extended')) {
+    } else if (ag_mechanic_inventory_started('es_extended')) {
         AGM.inv.backend = 'esx';
         AGM.inv.stashBackend = 'db';
     } else {

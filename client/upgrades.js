@@ -6,13 +6,9 @@
  * ============================================================================
  */
 
-/* Own scope: FiveM evaluates every file in a resource into one shared global,
-   so a top-level `const`/`let` here would collide with the same name in another
-   file and kill this one on load with a SyntaxError. */
-(() => {
 AGM.upgrades = {};
 
-let busy = false;
+let ag_mechanic_upgrades_busy = false;
 
 AGM.upgrades.open = async function (vehicle) {
     const info = AGM.state.describe(vehicle);
@@ -35,7 +31,7 @@ AGM.upgrades.open = async function (vehicle) {
 };
 
 AGM.upgrades.install = async function (info, category, tier, meta = {}) {
-    if (busy || !info) return false;
+    if (ag_mechanic_upgrades_busy || !info) return false;
 
     const vehicle = info.entity && DoesEntityExist(info.entity) ? info.entity : 0;
     if (!vehicle) {
@@ -51,7 +47,7 @@ AGM.upgrades.install = async function (info, category, tier, meta = {}) {
         return false;
     }
 
-    busy = true;
+    ag_mechanic_upgrades_busy = true;
     try {
         const heavy = meta.install === 'garage';
         const completed = await AGM.ui.progress({
@@ -85,7 +81,7 @@ AGM.upgrades.install = async function (info, category, tier, meta = {}) {
         );
         return true;
     } finally {
-        busy = false;
+        ag_mechanic_upgrades_busy = false;
         ClearPedTasks(PlayerPedId());
     }
 };
@@ -106,4 +102,3 @@ on('ag_mechanic:internal:nuiAction', async (action, args) => {
     if (vehicle) await AGM.upgrades.open(vehicle);
 });
 
-})();

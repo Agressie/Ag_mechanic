@@ -10,13 +10,9 @@
  * ============================================================================
  */
 
-/* Own scope: FiveM evaluates every file in a resource into one shared global,
-   so a top-level `const`/`let` here would collide with the same name in another
-   file and kill this one on load with a SyntaxError. */
-(() => {
 AGM.scanner = {};
 
-let busy = false;
+let ag_mechanic_scanner_busy = false;
 
 /** Where the port lives, per machine. Flavour for the progress bar. */
 function portLocation(blueprint) {
@@ -47,7 +43,7 @@ async function crouchAnim(ped) {
  * quick answer, and again on the server, which is the one that counts.
  */
 AGM.scanner.run = async function (vehicle) {
-    if (busy) return null;
+    if (ag_mechanic_scanner_busy) return null;
 
     const info = AGM.state.describe(vehicle);
     if (!info) {
@@ -67,7 +63,7 @@ AGM.scanner.run = async function (vehicle) {
         return null;
     }
 
-    busy = true;
+    ag_mechanic_scanner_busy = true;
     const ped = PlayerPedId();
 
     try {
@@ -114,7 +110,7 @@ AGM.scanner.run = async function (vehicle) {
 
         return result.scan;
     } finally {
-        busy = false;
+        ag_mechanic_scanner_busy = false;
         ClearPedTasks(PlayerPedId());
     }
 };
@@ -130,4 +126,3 @@ onNet('ag_mechanic:client:targetScan', (data) => {
     AGM.scanner.run(vehicle);
 });
 
-})();
