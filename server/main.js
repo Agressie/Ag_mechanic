@@ -9,40 +9,11 @@
 let ag_mechanic_main_booted = false;
 const ag_mechanic_main_intervals = [];
 
-/*
- * Same shared-scope hazard as the client: a config file that never loaded shows
- * up as an undefined-property error somewhere unrelated. Name it instead.
- */
-const ag_mechanic_main_configFiles = {
-    Config: 'config/config.js',
-    Classes: 'config/classes.js',
-    Components: 'config/components.js',
-    Tiers: 'config/tiers.js',
-    Dtc: 'config/dtc.js',
-    Damage: 'config/damage.js',
-    Handling: 'config/handling.js',
-    Shop: 'config/shop.js',
-    Locations: 'config/locations.js',
-    util: 'shared/util.js',
-    Health: 'shared/health.js',
-};
-
-function ag_mechanic_main_requireConfig() {
-    const missing = Object.keys(ag_mechanic_main_configFiles)
-        .filter((key) => !AGM[key])
-        .map((key) => `AGM.${key} (${ag_mechanic_main_configFiles[key]})`);
-    if (!missing.length) return;
-    throw new Error(
-        `shared config did not load: ${missing.join(', ')} - check that the file is on disk, `
-        + 'is listed in fxmanifest.lua shared_scripts, and did not throw earlier in this console',
-    );
-}
-
 async function boot() {
     if (ag_mechanic_main_booted) return;
     ag_mechanic_main_booted = true;
 
-    ag_mechanic_main_requireConfig();
+    AGM.requireConfig();
 
     await AGM.db.migrate();
 
