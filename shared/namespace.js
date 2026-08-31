@@ -58,11 +58,41 @@ AGM.manifestScripts = function (manifest, block) {
         .filter((file) => !file.startsWith('@'));
 };
 
+/*
+ * What the server is *actually* running, as opposed to what fxmanifest.lua on
+ * disk says. These come apart when the manifest changes: FiveM caches resource
+ * metadata and only rescans it on `refresh`, so `ensure`/`restart` alone will
+ * happily restart a resource using a file list from before your edit.
+ */
+AGM.loadedScripts = function (key) {
+    if (typeof GetNumResourceMetadata !== 'function') return null;
+    const out = [];
+    const count = GetNumResourceMetadata(AGM.RESOURCE, key) || 0;
+    for (let i = 0; i < count; i += 1) out.push(GetResourceMetadata(AGM.RESOURCE, key, i));
+    return out;
+};
+
 AGM.requireConfig = function () {
     const manifest = LoadResourceFile(AGM.RESOURCE, 'fxmanifest.lua') || '';
     const shared = AGM.manifestScripts(manifest, 'shared_scripts');
     const own = AGM.manifestScripts(manifest, AGM.IS_SERVER ? 'server_scripts' : 'client_scripts');
     const loads = shared.concat(own);
+
+    /* A stale metadata cache: the manifest on disk lists files this running
+       resource has never heard of. `ensure` cannot fix this, only `refresh`. */
+    const running = (AGM.loadedScripts('shared_script') || [])
+        .concat(AGM.loadedScripts(AGM.IS_SERVER ? 'server_script' : 'client_script') || []);
+    if (running.length) {
+        const unseen = loads.filter((file) => !file.includes('*') && !running.includes(file));
+        if (unseen.length) {
+            throw new Error(
+                'fxmanifest.lua lists files this resource is not running, so the server is using a'
+                + ' cached copy of the manifest from before it changed - run `refresh` and then'
+                + ` \`ensure ${AGM.RESOURCE}\`, because \`ensure\` on its own does not re-read the`
+                + ` manifest:\n  - ${unseen.join('\n  - ')}`,
+            );
+        }
+    }
     const onDisk = (file) => {
         const src = LoadResourceFile(AGM.RESOURCE, file);
         return src === null || src === undefined ? null : src;
