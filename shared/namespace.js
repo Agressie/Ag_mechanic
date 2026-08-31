@@ -29,8 +29,8 @@ AGM.log = {
  * properties of undefined" somewhere unrelated, in a file that is fine.
  *
  * Called from both entry points at boot. It does not just name the missing
- * file, it goes and looks at it, because the three ways this happens need
- * three different fixes.
+ * file, it goes and looks at it, because the ways this happens each need a
+ * different fix.
  */
 AGM.CONFIG_FILES = {
     Config: 'config/config.js',
@@ -46,18 +46,32 @@ AGM.CONFIG_FILES = {
     Health: 'shared/health.js',
 };
 
+/*
+ * The script lists out of fxmanifest.lua, with Lua line comments stripped
+ * first - a commented-out entry is still in the file's text, and mistaking one
+ * for a live entry is exactly the wrong answer to give someone.
+ */
+AGM.manifestScripts = function (manifest, block) {
+    const match = manifest.match(new RegExp(`${block}\\s*\\{([^}]*)\\}`));
+    if (!match) return [];
+    return Array.from(match[1].replace(/--[^\n]*/g, '').matchAll(/'([^']+)'/g), (m) => m[1])
+        .filter((file) => !file.startsWith('@'));
+};
+
 AGM.requireConfig = function () {
     const manifest = LoadResourceFile(AGM.RESOURCE, 'fxmanifest.lua') || '';
-
-    /* First: files the manifest promises that are not actually there. This is
-       what a half-updated copy looks like - overwriting the files you already
-       had while never copying the ones that are new. FiveM does log these, but
-       a long way up, mixed in with everything else starting. */
-    const listed = Array.from(manifest.matchAll(/'([^'@]+\.(?:js|lua))'/g), (m) => m[1]);
-    const absent = listed.filter((file) => {
+    const shared = AGM.manifestScripts(manifest, 'shared_scripts');
+    const own = AGM.manifestScripts(manifest, AGM.IS_SERVER ? 'server_scripts' : 'client_scripts');
+    const loads = shared.concat(own);
+    const onDisk = (file) => {
         const src = LoadResourceFile(AGM.RESOURCE, file);
-        return src === null || src === undefined;
-    });
+        return src === null || src === undefined ? null : src;
+    };
+
+    /* First: files the manifest promises that are not actually there. That is
+       what a half-updated copy looks like - files you already had get
+       overwritten while files that are new never get copied at all. */
+    const absent = loads.filter((file) => onDisk(file) === null);
     if (absent.length) {
         throw new Error(
             'these files are in fxmanifest.lua but not on disk, so this copy of the resource is'
@@ -67,22 +81,26 @@ AGM.requireConfig = function () {
 
     const missing = Object.keys(AGM.CONFIG_FILES).filter((key) => !AGM[key]);
     if (!missing.length) return;
+
+    const runtime = AGM.IS_SERVER ? 'server' : 'client';
     const detail = missing.map((key) => {
         const file = AGM.CONFIG_FILES[key];
-        const src = LoadResourceFile(AGM.RESOURCE, file);
+        const src = onDisk(file);
 
-        if (src === null || src === undefined) {
+        if (src === null) {
             return `${file} is not on disk - copy the whole resource folder over again`;
         }
-        if (!manifest.includes(`'${file}'`)) {
-            return `${file} is on disk but not listed in fxmanifest.lua shared_scripts - add it`;
+        if (!loads.includes(file)) {
+            return `${file} is on disk but the ${runtime} never loads it - fxmanifest.lua does not`
+                + ' list it in shared_scripts, or the line is commented out';
         }
         if (!src.includes(`AGM.${key} =`)) {
-            return `${file} is on disk and in the manifest but never assigns AGM.${key}`
+            return `${file} is on disk and loaded but never assigns AGM.${key}`
                 + ' - it is an old copy of the file, replace it';
         }
-        return `${file} loaded but AGM.${key} is still missing, so it threw partway through`
-            + ' - the real error is further up this console';
+        return `${file} is on disk, is loaded, and does assign AGM.${key} (${src.length} bytes), so`
+            + ' it threw while running - FiveM printed the real error earlier in this console,'
+            + ' above the "Started resource" line';
     });
 
     throw new Error(`shared config did not load:\n  - ${detail.join('\n  - ')}`);
